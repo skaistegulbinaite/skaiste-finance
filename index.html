@@ -515,6 +515,55 @@ body {
   <div id="ovInsights"></div>
 
   <div class="section-header">
+    <div class="section-title">PVM riba (€45,000 per 12 mėn)</div>
+  </div>
+
+  <div class="goal-card">
+    <div class="goal-header">
+      <div class="goal-name">Paskutiniai 12 mėn</div>
+      <div class="goal-amount"><span class="current" id="vatCur">0€</span> / 45,000€</div>
+    </div>
+    <div class="goal-bar"><div class="goal-bar-fill" id="vatBar" style="width:0%"></div></div>
+    <div class="goal-meta">
+      <span id="vatPct">0%</span>
+      <span id="vatNeeded">Iki PVM ribos: 45,000€</span>
+    </div>
+    <div id="vatAlert" style="display:none; margin-top:10px; padding:10px 12px; background:rgba(245,160,176,0.15); border:1px solid rgba(245,160,176,0.3); border-radius:10px; font-size:11px; color:var(--red);"></div>
+  </div>
+
+  <div class="section-header">
+    <div class="section-title">Mokesčiai (MB nario atlyginimui)</div>
+  </div>
+
+  <div class="goal-card" id="taxCard">
+    <div style="font-size:11px; color:var(--text3); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px;">Šio mėnesio sąskaita</div>
+    <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:14px;">
+      <div style="font-family:'Archivo Black',sans-serif; font-size:24px; color:var(--text);">€<span id="taxNet">0</span></div>
+      <div style="font-size:11px; color:var(--text3);">tau į ranką iš €<span id="taxSalary">0</span></div>
+    </div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; padding-top:10px; border-top:1px solid var(--border);">
+      <div>
+        <div style="font-size:9px; color:var(--text3); font-weight:700; text-transform:uppercase;">GPM (<span id="taxGpmRate">15</span>%)</div>
+        <div style="font-family:'Archivo Black',sans-serif; font-size:14px; color:var(--text); margin-top:2px;">€<span id="taxGpm">0</span></div>
+      </div>
+      <div>
+        <div style="font-size:9px; color:var(--text3); font-weight:700; text-transform:uppercase;">PSD (sveikata)</div>
+        <div style="font-family:'Archivo Black',sans-serif; font-size:14px; color:var(--text); margin-top:2px;">€<span id="taxPsd">0</span></div>
+      </div>
+      <div>
+        <div style="font-size:9px; color:var(--text3); font-weight:700; text-transform:uppercase;">VSD (sodra)</div>
+        <div style="font-family:'Archivo Black',sans-serif; font-size:14px; color:var(--text); margin-top:2px;">€<span id="taxVsd">0</span></div>
+      </div>
+      <div>
+        <div style="font-size:9px; color:var(--text3); font-weight:700; text-transform:uppercase;">VISO MOKESČIŲ</div>
+        <div style="font-family:'Archivo Black',sans-serif; font-size:14px; color:var(--accent); margin-top:2px;">€<span id="taxTotal">0</span></div>
+      </div>
+    </div>
+    <div style="margin-top:10px; font-size:10px; color:var(--text3); text-align:center;" id="taxNote">—</div>
+    <div style="margin-top:8px; font-size:9px; color:var(--text3); text-align:center; opacity:0.7;">⚠️ Apytikslis skaičiavimas. Patvirtink su buhaltere.</div>
+  </div>
+
+  <div class="section-header">
     <div class="section-title">Šio mėnesio tikslai</div>
   </div>
 
@@ -777,6 +826,25 @@ body {
   </div>
 
   <div class="section-header">
+    <div class="section-title">Mokesčiai (MB)</div>
+  </div>
+
+  <div class="settings-list">
+    <div class="settings-item">
+      <div class="settings-name">Mėn. atlyginimas sau (€)<span style="display:block;font-size:9px;color:var(--text3);font-weight:500;margin-top:2px;">Lėšos asmeniniam naudojimui</span></div>
+      <input class="settings-edit" type="number" id="taxMbSalary" onchange="saveTaxSettings()">
+    </div>
+    <div class="settings-item">
+      <div class="settings-name">Drausta per kitą darbą<span style="display:block;font-size:9px;color:var(--text3);font-weight:500;margin-top:2px;">Beribu — nereikia mokėti PSD</span></div>
+      <input type="checkbox" id="taxPsdExempt" onchange="saveTaxSettings()" style="width:24px;height:24px;accent-color:var(--accent);">
+    </div>
+    <div class="settings-item">
+      <div class="settings-name">PVM ribinė riba (€)<span style="display:block;font-size:9px;color:var(--text3);font-weight:500;margin-top:2px;">Per 12 mėn — privaloma registruotis</span></div>
+      <input class="settings-edit" type="number" id="taxVatThreshold" onchange="saveTaxSettings()">
+    </div>
+  </div>
+
+  <div class="section-header">
     <div class="section-title">GitHub sync</div>
   </div>
 
@@ -990,7 +1058,14 @@ const DEFAULT_DATA = {
     total_monthly: 10000
   },
   beribuMonthlyCard: 500,
-  beribuMonthlyCash: 200
+  beribuMonthlyCash: 200,
+  tax: {
+    mbSalary: 1500, // Mėnesinis atlyginimas iš MB sau
+    mbYearStart: '2026-01', // Kada įsteigta MB (pirmi 2 metai = 0% pelno mokestis)
+    vatThreshold: 45000, // PVM ribinė riba 12 mėn
+    vatTrackingStart: '2026-01', // Nuo kada skaičiuoti 12 mėn revenue
+    psdExempt: true // Drausta per kitą darbą (Beribu) — nemoka PSD kaip MB narys
+  }
 };
 
 let data = loadData();
@@ -1381,6 +1456,97 @@ function getMonthIncome(weekKey) {
   const monthKey = `${dates.start.getUTCFullYear()}-${String(dates.start.getUTCMonth()+1).padStart(2,'0')}`;
   const agg = getMonthAggregate(monthKey);
   return calcMonthIncome2(agg);
+}
+
+// ============ TAX CALCULATIONS (Lithuania MB 2026) ============
+// Source: vmi.lt, sodra.lt — VERIFY su buhaltere prieš mokant!
+//
+// MB nario atlyginimo mokesčiai:
+// 1. GPM 15% iki 12 VDU/metus (~€26,304 = €2,192/mėn) — virš tada 20%
+// 2. PSD: €80.48/mėn fiksuotas (sveikatos draudimas)
+// 3. VSD: 12.52% nuo X% atlyginimo:
+//    - Sausis-Birželis 2026: bazė = 50% atlyginimo
+//    - Liepa+ 2026: bazė = 90% atlyginimo
+// 4. Pelno mokestis: 0% pirmi 2 metai (jei nauja MB), po to 7%
+
+const TAX_RATES = {
+  GPM_LOW: 0.15,        // iki 12 VDU
+  GPM_MID: 0.20,        // 12-36 VDU
+  GPM_HIGH: 0.25,       // 36-60 VDU
+  VDU_2026: 2192,       // ~€2,192/mėn (12 VDU/metai = €26,304)
+  PSD_MONTHLY: 80.48,   // Fixed PSD
+  VSD_RATE: 0.1252,     // 12.52% VSD
+  PELNAS_NEW: 0.0,      // 0% pirmi 2 metai
+  PELNAS_SMALL: 0.07,   // 7% mažoms MB po 2 metų
+};
+
+function calcMonthlyTaxes(salary, currentMonth) {
+  // currentMonth format: "2026-04"
+  const [year, mon] = currentMonth.split('-').map(Number);
+
+  // GPM — pagal pajamų lygį per metus
+  let gpmRate;
+  if (salary <= TAX_RATES.VDU_2026) {
+    gpmRate = TAX_RATES.GPM_LOW;
+  } else if (salary <= TAX_RATES.VDU_2026 * 3) {
+    gpmRate = TAX_RATES.GPM_MID;
+  } else {
+    gpmRate = TAX_RATES.GPM_HIGH;
+  }
+  const gpm = salary * gpmRate;
+
+  // PSD — fiksuotas, BET jei drausta per kitą darbą (psdExempt) → 0
+  const psdExempt = data.tax?.psdExempt || false;
+  const psd = psdExempt ? 0 : TAX_RATES.PSD_MONTHLY;
+
+  // VSD bazė priklausomai nuo mėnesio
+  const isFirstHalf2026 = (year === 2026 && mon <= 6);
+  const vsdBaseFactor = isFirstHalf2026 ? 0.5 : 0.9;
+  const vsdBase = salary * vsdBaseFactor;
+  const vsd = vsdBase * TAX_RATES.VSD_RATE;
+
+  const totalTax = gpm + psd + vsd;
+  const netIncome = salary - totalTax;
+
+  let notes = isFirstHalf2026
+    ? 'VSD bazė 50% (Sausis-Birželis 2026)'
+    : 'VSD bazė 90% (Liepa+ 2026)';
+  if (psdExempt) {
+    notes += ' · PSD nemokama (drausta per kitą darbą)';
+  }
+
+  return {
+    salary,
+    gpm,
+    gpmRate: gpmRate * 100,
+    psd,
+    psdExempt,
+    vsd,
+    vsdBase,
+    vsdBaseFactor: vsdBaseFactor * 100,
+    totalTax,
+    netIncome,
+    notes
+  };
+}
+
+function calc12MonthRevenue() {
+  // Sum income for last 12 months from current
+  const today = new Date();
+  let total = 0;
+  const months = {};
+
+  // Aggregate per month from all weeks + months data
+  // Look back 12 months
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(today);
+    d.setMonth(d.getMonth() - i);
+    const mk = getMonthKey(d);
+    const agg = getMonthAggregate(mk);
+    months[mk] = calcMonthIncome2(agg);
+    total += months[mk];
+  }
+  return {total, byMonth: months};
 }
 
 // ============ FORMAT ============
@@ -1816,6 +1982,53 @@ function refreshOverview() {
   document.getElementById('goalTotPct').textContent = pctTot.toFixed(0)+'%';
   document.getElementById('goalTotNeeded').textContent =
     monthTot >= goalTot ? '✓ Pasiekta' : `Trūksta ${fmt(goalTot - monthTot)}€`;
+
+  // ── Tax calculation ──
+  const salary = data.tax?.mbSalary || 0;
+  const monthKeyForTax = isMonth ? currentMonth : (function(){
+    const wd = getWeekDates(currentWeek);
+    return `${wd.start.getUTCFullYear()}-${String(wd.start.getUTCMonth()+1).padStart(2,'0')}`;
+  })();
+  const taxes = calcMonthlyTaxes(salary, monthKeyForTax);
+  document.getElementById('taxSalary').textContent = fmt(taxes.salary);
+  document.getElementById('taxNet').textContent = fmt(taxes.netIncome);
+  document.getElementById('taxGpm').textContent = fmt(taxes.gpm);
+  document.getElementById('taxGpmRate').textContent = taxes.gpmRate;
+  document.getElementById('taxPsd').textContent = taxes.psdExempt ? '0 (✓)' : fmt(taxes.psd);
+  document.getElementById('taxVsd').textContent = fmt(taxes.vsd);
+  document.getElementById('taxTotal').textContent = fmt(taxes.totalTax);
+  document.getElementById('taxNote').textContent = taxes.notes;
+
+  // ── VAT threshold tracking ──
+  const vatData = calc12MonthRevenue();
+  const vatThreshold = data.tax?.vatThreshold || 45000;
+  const vatPctNum = Math.min(100, vatData.total / vatThreshold * 100);
+  document.getElementById('vatCur').textContent = fmt(vatData.total)+'€';
+  document.getElementById('vatBar').style.width = vatPctNum+'%';
+  document.getElementById('vatPct').textContent = vatPctNum.toFixed(0)+'%';
+  document.getElementById('vatNeeded').textContent =
+    vatData.total >= vatThreshold ? '⚠️ PRIVALOMA REGISTRUOTIS PVM' : `Iki PVM ribos: ${fmt(vatThreshold - vatData.total)}€`;
+
+  const vatAlertEl = document.getElementById('vatAlert');
+  if (vatData.total >= vatThreshold) {
+    vatAlertEl.style.display = 'block';
+    vatAlertEl.style.background = 'rgba(245,160,176,0.25)';
+    vatAlertEl.innerHTML = '🚨 <strong>SKUBU:</strong> Pasiekei €45,000 ribą per 12 mėn. Privaloma per 5 d. registruotis PVM mokėtoju (vmi.lt).';
+  } else if (vatPctNum >= 80) {
+    vatAlertEl.style.display = 'block';
+    vatAlertEl.style.background = 'rgba(251,191,36,0.15)';
+    vatAlertEl.style.borderColor = 'rgba(251,191,36,0.3)';
+    vatAlertEl.style.color = '#fbbf24';
+    vatAlertEl.innerHTML = `⚠️ <strong>Dėmesio:</strong> Likę ${fmt(vatThreshold - vatData.total)}€ iki PVM ribos. Pasiruošk dokumentams.`;
+  } else if (vatPctNum >= 60) {
+    vatAlertEl.style.display = 'block';
+    vatAlertEl.style.background = 'rgba(251,191,36,0.08)';
+    vatAlertEl.style.borderColor = 'rgba(251,191,36,0.2)';
+    vatAlertEl.style.color = '#fbbf24';
+    vatAlertEl.innerHTML = `Likę ${fmt(vatThreshold - vatData.total)}€ iki PVM ribos. Stebėk artimiausius mėnesius.`;
+  } else {
+    vatAlertEl.style.display = 'none';
+  }
 }
 
 function refreshInsights() {
@@ -2243,6 +2456,11 @@ function refreshSettings() {
   document.getElementById('goalRetouchLab').value = data.goals.retouchlab_monthly;
   document.getElementById('goalTotal').value = data.goals.total_monthly;
 
+  // Tax settings
+  document.getElementById('taxMbSalary').value = data.tax?.mbSalary || 1500;
+  document.getElementById('taxPsdExempt').checked = data.tax?.psdExempt || false;
+  document.getElementById('taxVatThreshold').value = data.tax?.vatThreshold || 45000;
+
   // GitHub status
   const ghStatusEl = document.getElementById('ghStatus');
   if (ghStatusEl) {
@@ -2294,6 +2512,15 @@ function saveModal() {
 function saveGoals() {
   data.goals.retouchlab_monthly = parseFloat(document.getElementById('goalRetouchLab').value) || 5000;
   data.goals.total_monthly = parseFloat(document.getElementById('goalTotal').value) || 10000;
+  saveData();
+  showSaveToast();
+}
+
+function saveTaxSettings() {
+  if (!data.tax) data.tax = {};
+  data.tax.mbSalary = parseFloat(document.getElementById('taxMbSalary').value) || 1500;
+  data.tax.psdExempt = document.getElementById('taxPsdExempt').checked;
+  data.tax.vatThreshold = parseFloat(document.getElementById('taxVatThreshold').value) || 45000;
   saveData();
   showSaveToast();
 }
