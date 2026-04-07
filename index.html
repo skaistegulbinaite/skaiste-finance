@@ -1350,16 +1350,22 @@ function calcWeekProfit(week) {
 }
 
 function getMonthRetouchLab(weekKey) {
-  // Sum RL income for all weeks in same month as weekKey
+  // Sum RL income for all weeks in same month as weekKey + monthly entry
   const dates = getWeekDates(weekKey);
   const month = dates.start.getUTCMonth();
   const year = dates.start.getUTCFullYear();
+  const monthKey = `${year}-${String(month+1).padStart(2,'0')}`;
   let total = 0;
   for (const wk in data.weeks) {
     const wd = getWeekDates(wk);
     if (wd.start.getUTCMonth() === month && wd.start.getUTCFullYear() === year) {
       total += calcRetouchLab(data.weeks[wk]);
     }
+  }
+  // Add monthly entry
+  const m = data.months && data.months[monthKey];
+  if (m) {
+    total += calcRetouchLabAgg(m);
   }
   return total;
 }
@@ -1368,12 +1374,18 @@ function getMonthIncome(weekKey) {
   const dates = getWeekDates(weekKey);
   const month = dates.start.getUTCMonth();
   const year = dates.start.getUTCFullYear();
+  const monthKey = `${year}-${String(month+1).padStart(2,'0')}`;
   let total = 0;
   for (const wk in data.weeks) {
     const wd = getWeekDates(wk);
     if (wd.start.getUTCMonth() === month && wd.start.getUTCFullYear() === year) {
       total += calcWeekIncome(data.weeks[wk]);
     }
+  }
+  // Add monthly entry
+  const m = data.months && data.months[monthKey];
+  if (m) {
+    total += calcMonthIncome2(m);
   }
   return total;
 }
