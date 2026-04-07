@@ -1,4 +1,4 @@
-const CACHE_NAME = 'skaiste-finance-v5';
+const CACHE_NAME = 'skaiste-finance-v6';
 const ASSETS = ['index.html', 'manifest.json'];
 
 self.addEventListener('install', e => {

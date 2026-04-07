@@ -819,6 +819,14 @@ body {
 <!-- ============ PAGE: INSIGHTS (Traffic + Search) ============ -->
 <div class="page" id="page-insights">
 
+  <!-- MORNING BRIEFING -->
+  <div id="morningBriefing" style="display:none; background:linear-gradient(135deg, rgba(245,198,208,0.15), rgba(232,160,184,0.05)); border:1px solid rgba(245,198,208,0.3); border-radius:18px; padding:18px; margin-bottom:14px;">
+    <div style="font-size:10px; font-weight:700; color:var(--accent); text-transform:uppercase; letter-spacing:1px; margin-bottom:6px;">☀️ Šios dienos briefing</div>
+    <div id="briefHeadline" style="font-family:'Archivo Black',sans-serif; font-size:18px; line-height:1.3; margin-bottom:12px;">—</div>
+    <div id="briefObservations" style="margin-bottom:10px;"></div>
+    <div id="briefActions"></div>
+  </div>
+
   <div class="hero-card" style="background:linear-gradient(135deg, #2e1a20 0%, #3d2229 100%);">
     <div class="hero-label">Lankytojai (30 dienų)</div>
     <div class="hero-amount" id="insUsers">—</div>
@@ -1480,6 +1488,29 @@ function refreshInsightsData() {
 function renderInsights() {
   if (!analyticsData) return;
   const d = analyticsData;
+
+  // Morning Briefing
+  const briefing = d.dailyBriefing;
+  const briefingEl = document.getElementById('morningBriefing');
+  if (briefing && briefing.headline) {
+    briefingEl.style.display = 'block';
+    document.getElementById('briefHeadline').textContent = briefing.headline;
+
+    const obsHtml = (briefing.observations || []).map(o =>
+      `<div style="font-size:12px; color:var(--text); padding:4px 0; line-height:1.5;">• ${o}</div>`
+    ).join('');
+    document.getElementById('briefObservations').innerHTML = obsHtml;
+
+    if ((briefing.actions || []).length > 0) {
+      const actHtml = `<div style="font-size:10px; font-weight:700; color:var(--text3); text-transform:uppercase; letter-spacing:0.5px; margin-top:8px; margin-bottom:4px;">Šiandien daryti:</div>` +
+        briefing.actions.map(a =>
+          `<div style="font-size:12px; color:var(--accent); padding:3px 0; line-height:1.5;">→ ${a}</div>`
+        ).join('');
+      document.getElementById('briefActions').innerHTML = actHtml;
+    }
+  } else {
+    briefingEl.style.display = 'none';
+  }
 
   // Determine which dataset to show based on current period + nav
   let periodData = null;
