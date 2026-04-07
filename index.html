@@ -80,6 +80,25 @@ body {
   border:none; cursor:pointer; letter-spacing:0.3px; white-space:nowrap;
 }
 
+/* Period toggle */
+.period-toggle {
+  display:flex; gap:0; padding:4px 16px 8px;
+  justify-content:center;
+}
+.period-toggle-inner {
+  display:flex; background:var(--surface2); border-radius:12px; padding:3px;
+  gap:2px;
+}
+.period-btn {
+  background:transparent; border:none; cursor:pointer;
+  padding:8px 24px; border-radius:10px;
+  color:var(--text3); font-size:12px; font-weight:700;
+  text-transform:uppercase; letter-spacing:0.5px;
+  transition:all .15s;
+}
+.period-btn.active { background:var(--accent); color:var(--bg); }
+.period-btn:active { transform:scale(0.95); }
+
 /* PAGE CONTAINER */
 .page { display:none; padding:0 16px; }
 .page.active { display:block; }
@@ -434,17 +453,25 @@ body {
 
 <div id="syncStatus" style="position:fixed;top:12px;left:50%;transform:translateX(-50%);background:var(--surface3);color:var(--text2);font-size:10px;font-weight:700;padding:5px 12px;border-radius:10px;opacity:0;transition:opacity .3s;z-index:1000;pointer-events:none;text-transform:uppercase;letter-spacing:0.5px;"></div>
 
+<!-- PERIOD TOGGLE -->
+<div class="period-toggle">
+  <div class="period-toggle-inner">
+    <button class="period-btn active" id="periodWeek" onclick="setPeriod('week')">Savaitė</button>
+    <button class="period-btn" id="periodMonth" onclick="setPeriod('month')">Mėnuo</button>
+  </div>
+</div>
+
 <!-- WEEK NAVIGATION -->
 <div class="week-nav">
   <div class="week-nav-arrows">
-    <button onclick="changeWeek(-1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
+    <button onclick="changePeriod(-1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
   </div>
   <div class="week-label">
     <span id="weekLabelText">Šią savaitę</span>
     <span class="dates" id="weekLabelDates">—</span>
   </div>
   <div class="week-nav-arrows">
-    <button onclick="changeWeek(1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg></button>
+    <button onclick="changePeriod(1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg></button>
   </div>
   <button class="btn-this-week" onclick="goToToday()">DABAR</button>
 </div>
@@ -959,6 +986,8 @@ const DEFAULT_DATA = {
 
 let data = loadData();
 let currentWeek = getWeekKey(new Date());
+let currentMonth = getMonthKey(new Date());
+let currentPeriod = localStorage.getItem('finance-period') || 'week'; // 'week' or 'month'
 let currentPage = 'overview';
 
 function loadData() {
@@ -1096,6 +1125,11 @@ function getWeekKey(date) {
   return `${d.getUTCFullYear()}-W${String(weekNum).padStart(2,'0')}`;
 }
 
+function getMonthKey(date) {
+  const d = new Date(date);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+
 function getWeekDates(weekKey) {
   const [year, weekStr] = weekKey.split('-W');
   const week = parseInt(weekStr);
@@ -1108,22 +1142,103 @@ function getWeekDates(weekKey) {
   return {start: monday, end: sunday};
 }
 
+function getMonthDates(monthKey) {
+  const [year, month] = monthKey.split('-').map(Number);
+  const start = new Date(Date.UTC(year, month-1, 1));
+  const end = new Date(Date.UTC(year, month, 0));
+  return {start, end};
+}
+
+function getMonthName(monthKey) {
+  const months = ['Sausis','Vasaris','Kovas','Balandis','Gegužė','Birželis','Liepa','Rugpjūtis','Rugsėjis','Spalis','Lapkritis','Gruodis'];
+  const [year, month] = monthKey.split('-').map(Number);
+  return `${months[month-1]} ${year}`;
+}
+
 function formatDate(d) {
   const months = ['sau','vas','kov','bal','geg','bir','lie','rgp','rgs','spa','lap','grd'];
   return `${d.getUTCDate()} ${months[d.getUTCMonth()]}`;
 }
 
-function changeWeek(delta) {
-  const dates = getWeekDates(currentWeek);
-  const newDate = new Date(dates.start);
-  newDate.setUTCDate(newDate.getUTCDate() + delta * 7);
-  currentWeek = getWeekKey(newDate);
+function setPeriod(period) {
+  currentPeriod = period;
+  localStorage.setItem('finance-period', period);
+  document.getElementById('periodWeek').classList.toggle('active', period === 'week');
+  document.getElementById('periodMonth').classList.toggle('active', period === 'month');
+  refreshAll();
+}
+
+function changePeriod(delta) {
+  if (currentPeriod === 'week') {
+    const dates = getWeekDates(currentWeek);
+    const newDate = new Date(dates.start);
+    newDate.setUTCDate(newDate.getUTCDate() + delta * 7);
+    currentWeek = getWeekKey(newDate);
+  } else {
+    const dates = getMonthDates(currentMonth);
+    const newDate = new Date(dates.start);
+    newDate.setUTCMonth(newDate.getUTCMonth() + delta);
+    currentMonth = getMonthKey(newDate);
+  }
   refreshAll();
 }
 
 function goToToday() {
   currentWeek = getWeekKey(new Date());
+  currentMonth = getMonthKey(new Date());
   refreshAll();
+}
+
+// Get all weeks within a month
+function getWeeksInMonth(monthKey) {
+  const {start, end} = getMonthDates(monthKey);
+  const weekKeys = new Set();
+  const d = new Date(start);
+  while (d <= end) {
+    weekKeys.add(getWeekKey(d));
+    d.setUTCDate(d.getUTCDate() + 1);
+  }
+  return Array.from(weekKeys);
+}
+
+// Aggregate income/expense data over a month
+function getMonthAggregate(monthKey) {
+  const weekKeys = getWeeksInMonth(monthKey);
+  const agg = {
+    rl_instagram:0, rl_email:0, rl_influencer:0, rl_meta:0,
+    rl_tiktok:0, rl_blog:0, rl_direct:0, rl_count:0,
+    photo_shopify:0, photo_cash:0,
+    beribu_card:0, beribu_cash:0,
+    ads_meta:0, ads_tiktok:0, ads_google:0,
+    retoucher:0, buhaltere:0, extra:0,
+    codes_sent:0, reviews:0, outreach:0,
+  };
+  weekKeys.forEach(wk => {
+    const w = data.weeks[wk];
+    if (!w) return;
+    Object.keys(agg).forEach(k => {
+      agg[k] += w[k] || 0;
+    });
+  });
+  return agg;
+}
+
+function calcRetouchLabAgg(agg) {
+  return (agg.rl_instagram||0) + (agg.rl_email||0) + (agg.rl_influencer||0) +
+         (agg.rl_meta||0) + (agg.rl_tiktok||0) + (agg.rl_blog||0) + (agg.rl_direct||0);
+}
+
+function calcMonthIncome2(agg) {
+  return calcRetouchLabAgg(agg) + (agg.photo_shopify||0) + (agg.photo_cash||0) +
+         (agg.beribu_card||0) + (agg.beribu_cash||0);
+}
+
+function calcMonthExpenses2(agg) {
+  // Recurring expenses are MONTHLY (not divided by 4)
+  const recurring = data.recurringExpenses.reduce((sum, e) => sum + e.amount, 0);
+  return recurring +
+         (agg.ads_meta||0) + (agg.ads_tiktok||0) + (agg.ads_google||0) +
+         (agg.retoucher||0) + (agg.buhaltere||0) + (agg.extra||0);
 }
 
 // ============ WEEK DATA ============
@@ -1231,17 +1346,28 @@ function showPage(page) {
 
 // ============ REFRESH ============
 function refreshAll() {
-  // Header week
-  const dates = getWeekDates(currentWeek);
-  const weekNum = currentWeek.split('-W')[1];
-  document.getElementById('headerWeekNum').textContent = 'W'+weekNum;
+  // Header label + week/month nav text
+  if (currentPeriod === 'week') {
+    const dates = getWeekDates(currentWeek);
+    const weekNum = currentWeek.split('-W')[1];
+    document.getElementById('headerWeekNum').textContent = 'W'+weekNum;
+    document.querySelector('.header-week .label').textContent = 'Savaitė';
 
-  const today = getWeekKey(new Date());
-  document.getElementById('weekLabelText').textContent =
-    currentWeek === today ? 'Šią savaitę' :
-    `Savaitė ${weekNum}`;
-  document.getElementById('weekLabelDates').textContent =
-    `${formatDate(dates.start)} – ${formatDate(dates.end)}`;
+    const todayKey = getWeekKey(new Date());
+    document.getElementById('weekLabelText').textContent =
+      currentWeek === todayKey ? 'Šią savaitę' : `Savaitė ${weekNum}`;
+    document.getElementById('weekLabelDates').textContent =
+      `${formatDate(dates.start)} – ${formatDate(dates.end)}`;
+  } else {
+    const monthName = getMonthName(currentMonth);
+    document.getElementById('headerWeekNum').textContent = currentMonth.split('-')[1];
+    document.querySelector('.header-week .label').textContent = 'Mėnuo';
+
+    const todayMonth = getMonthKey(new Date());
+    document.getElementById('weekLabelText').textContent =
+      currentMonth === todayMonth ? 'Šį mėnesį' : monthName.split(' ')[0];
+    document.getElementById('weekLabelDates').textContent = monthName;
+  }
 
   if (currentPage === 'overview') refreshOverview();
   if (currentPage === 'retouchlab') refreshRetouchLab();
@@ -1435,26 +1561,51 @@ function renderInsights() {
 }
 
 function refreshOverview() {
-  const week = getWeek(currentWeek);
-  const income = calcWeekIncome(week);
-  const expenses = calcWeekExpenses(week);
-  const profit = income - expenses;
-  const rl = calcRetouchLab(week);
-  const photo = (week.photo_shopify||0) + (week.photo_cash||0);
-  const beribu = (week.beribu_card||0) + (week.beribu_cash||0);
-  const ads = (week.ads_meta||0) + (week.ads_tiktok||0) + (week.ads_google||0);
+  let income, expenses, profit, rl, photo, beribu, ads, salesCount, adRevenue;
+  let isMonth = currentPeriod === 'month';
+
+  if (isMonth) {
+    const agg = getMonthAggregate(currentMonth);
+    income = calcMonthIncome2(agg);
+    expenses = calcMonthExpenses2(agg);
+    rl = calcRetouchLabAgg(agg);
+    photo = (agg.photo_shopify||0) + (agg.photo_cash||0);
+    beribu = (agg.beribu_card||0) + (agg.beribu_cash||0);
+    ads = (agg.ads_meta||0) + (agg.ads_tiktok||0) + (agg.ads_google||0);
+    salesCount = agg.rl_count || 0;
+    adRevenue = (agg.rl_meta||0) + (agg.rl_tiktok||0);
+  } else {
+    const week = getWeek(currentWeek);
+    income = calcWeekIncome(week);
+    expenses = calcWeekExpenses(week);
+    rl = calcRetouchLab(week);
+    photo = (week.photo_shopify||0) + (week.photo_cash||0);
+    beribu = (week.beribu_card||0) + (week.beribu_cash||0);
+    ads = (week.ads_meta||0) + (week.ads_tiktok||0) + (week.ads_google||0);
+    salesCount = week.rl_count || 0;
+    adRevenue = (week.rl_meta||0) + (week.rl_tiktok||0);
+  }
+  profit = income - expenses;
+
+  // Update hero label
+  document.querySelector('#page-overview .hero-card .hero-label').textContent =
+    isMonth ? 'Šio mėnesio pelnas' : 'Šios savaitės pelnas';
 
   document.getElementById('ovProfit').textContent = fmt(profit);
   document.getElementById('ovIncome').textContent = fmt(income)+'€';
   document.getElementById('ovExpenses').textContent = fmt(expenses)+'€';
   document.getElementById('ovRL').textContent = fmt(rl);
-  document.getElementById('ovRLSales').textContent = week.rl_count||0;
+  document.getElementById('ovRLSales').textContent = salesCount;
   document.getElementById('ovPhoto').textContent = fmt(photo);
   document.getElementById('ovBeribu').textContent = fmt(beribu);
   document.getElementById('ovAds').textContent = fmt(ads);
 
+  // Update Beribu sub-label
+  document.querySelector('.metric-card .label + .value + .sub')?.textContent;
+  const beribuSubs = document.querySelectorAll('.metric-card .sub');
+  if (beribuSubs[2]) beribuSubs[2].textContent = isMonth ? '500€ kortele + 200€ grynais' : '125€/sav (500€/mėn)';
+
   // Ad ROI
-  const adRevenue = (week.rl_meta||0) + (week.rl_tiktok||0);
   if (ads > 0) {
     const roi = ((adRevenue - ads) / ads * 100).toFixed(0);
     document.getElementById('ovAdsROI').textContent =
@@ -1463,35 +1614,50 @@ function refreshOverview() {
     document.getElementById('ovAdsROI').textContent = 'Nėra reklamų';
   }
 
-  // Delta vs prev week
-  const dates = getWeekDates(currentWeek);
-  const prevDate = new Date(dates.start);
-  prevDate.setUTCDate(prevDate.getUTCDate() - 7);
-  const prevKey = getWeekKey(prevDate);
-  const prevWeek = data.weeks[prevKey];
+  // Delta vs prev period
+  let prevProfit = null;
+  if (isMonth) {
+    const dates = getMonthDates(currentMonth);
+    const prevDate = new Date(dates.start);
+    prevDate.setUTCMonth(prevDate.getUTCMonth() - 1);
+    const prevKey = getMonthKey(prevDate);
+    const weekKeys = getWeeksInMonth(prevKey);
+    const hasData = weekKeys.some(wk => data.weeks[wk]);
+    if (hasData) {
+      const prevAgg = getMonthAggregate(prevKey);
+      prevProfit = calcMonthIncome2(prevAgg) - calcMonthExpenses2(prevAgg);
+    }
+  } else {
+    const dates = getWeekDates(currentWeek);
+    const prevDate = new Date(dates.start);
+    prevDate.setUTCDate(prevDate.getUTCDate() - 7);
+    const prevKey = getWeekKey(prevDate);
+    const prevWeek = data.weeks[prevKey];
+    if (prevWeek) prevProfit = calcWeekProfit(prevWeek);
+  }
   const deltaEl = document.getElementById('ovDelta');
-  if (prevWeek) {
-    const prevProfit = calcWeekProfit(prevWeek);
+  if (prevProfit !== null) {
     const diff = profit - prevProfit;
+    const periodWord = isMonth ? 'mėnesį' : 'savaitę';
     if (Math.abs(diff) < 1) {
       deltaEl.className = 'hero-delta flat';
-      deltaEl.textContent = '— tas pats kaip pereitą savaitę';
+      deltaEl.textContent = `— tas pats kaip pereitą ${periodWord}`;
     } else if (diff > 0) {
       deltaEl.className = 'hero-delta up';
-      deltaEl.textContent = `↑ +${fmt(diff)}€ vs pereitą savaitę`;
+      deltaEl.textContent = `↑ +${fmt(diff)}€ vs pereitą ${periodWord}`;
     } else {
       deltaEl.className = 'hero-delta down';
-      deltaEl.textContent = `↓ ${fmt(diff)}€ vs pereitą savaitę`;
+      deltaEl.textContent = `↓ ${fmt(diff)}€ vs pereitą ${periodWord}`;
     }
   } else {
     deltaEl.className = 'hero-delta flat';
-    deltaEl.textContent = '— pirma įvedimo savaitė';
+    deltaEl.textContent = `— pirmas ${isMonth ? 'mėnuo' : 'savaitė'}`;
   }
 
   // Insights
   refreshInsights();
 
-  // Goals
+  // Goals — always show CURRENT month progress (independent of period)
   const monthRL = getMonthRetouchLab(currentWeek);
   const monthTot = getMonthIncome(currentWeek);
   const goalRL = data.goals.retouchlab_monthly;
@@ -1591,20 +1757,35 @@ function refreshInsights() {
 }
 
 function refreshRetouchLab() {
-  const week = getWeek(currentWeek);
-  const total = calcRetouchLab(week);
-  const count = week.rl_count || 0;
+  let dataset, total, count;
+  let isMonth = currentPeriod === 'month';
+
+  if (isMonth) {
+    dataset = getMonthAggregate(currentMonth);
+    total = calcRetouchLabAgg(dataset);
+    count = dataset.rl_count || 0;
+  } else {
+    dataset = getWeek(currentWeek);
+    total = calcRetouchLab(dataset);
+    count = dataset.rl_count || 0;
+  }
   const avg = count > 0 ? total / count : 0;
+
+  // Update labels
+  document.querySelector('#page-retouchlab .hero-card .hero-label').textContent =
+    isMonth ? 'RetouchLab šį mėnesį' : 'RetouchLab šią savaitę';
 
   document.getElementById('rlTotal').textContent = fmt(total);
   document.getElementById('rlSalesCount').textContent = count;
   document.getElementById('rlAvgPrice').textContent = fmt(avg)+'€';
 
-  const monthRL = getMonthRetouchLab(currentWeek);
+  const monthRL = isMonth ? total : getMonthRetouchLab(currentWeek);
   document.getElementById('rlMonth').textContent = fmt(monthRL);
 
   const pct = (monthRL / data.goals.retouchlab_monthly * 100).toFixed(0);
   document.getElementById('rlGoalPct').textContent = pct;
+  // Use dataset for sources
+  const week = dataset;
 
   // Sources list
   const sources = [
@@ -1697,36 +1878,87 @@ function refreshRetouchLab() {
   document.getElementById('rlInsights').innerHTML = rlInsightsHTML;
 }
 
+const ENTRY_FIELDS = [
+  'rl_instagram','rl_email','rl_influencer','rl_meta','rl_tiktok','rl_blog','rl_direct','rl_count',
+  'photo_shopify','photo_cash','beribu_card','beribu_cash',
+  'ads_meta','ads_tiktok','ads_google','retoucher','buhaltere','extra',
+  'codes_sent','reviews','outreach'
+];
+
 function refreshEntry() {
-  const week = getWeek(currentWeek);
-  const fields = [
-    'rl_instagram','rl_email','rl_influencer','rl_meta','rl_tiktok','rl_blog','rl_direct','rl_count',
-    'photo_shopify','photo_cash','beribu_card','beribu_cash',
-    'ads_meta','ads_tiktok','ads_google','retoucher','buhaltere','extra',
-    'codes_sent','reviews','outreach'
-  ];
-  fields.forEach(f => {
-    const el = document.getElementById('in_'+f);
-    if (el) el.value = week[f] || '';
-  });
-  document.getElementById('in_extra_notes').value = week.extra_notes || '';
-  document.getElementById('in_notes').value = week.notes || '';
+  // Add a header indicator showing current period mode
+  let entryNoteEl = document.getElementById('entryPeriodNote');
+  if (!entryNoteEl) {
+    entryNoteEl = document.createElement('div');
+    entryNoteEl.id = 'entryPeriodNote';
+    entryNoteEl.style.cssText = 'background:var(--surface2); padding:12px 16px; border-radius:14px; margin-bottom:14px; font-size:12px; color:var(--text2); text-align:center;';
+    document.getElementById('page-entry').prepend(entryNoteEl);
+  }
+
+  if (currentPeriod === 'month') {
+    entryNoteEl.innerHTML = `<strong style="color:var(--accent)">Mėnesio režimas</strong> — įvedi MĖNESIO sumas. ${getMonthName(currentMonth)}`;
+
+    // Aggregate all weeks for this month and show in form
+    const agg = getMonthAggregate(currentMonth);
+    ENTRY_FIELDS.forEach(f => {
+      const el = document.getElementById('in_'+f);
+      if (el) el.value = agg[f] || '';
+    });
+    // Notes — concatenate weeks notes
+    const weekKeys = getWeeksInMonth(currentMonth);
+    let allNotes = [];
+    let allExtraNotes = [];
+    weekKeys.forEach(wk => {
+      if (data.weeks[wk]?.notes) allNotes.push(data.weeks[wk].notes);
+      if (data.weeks[wk]?.extra_notes) allExtraNotes.push(data.weeks[wk].extra_notes);
+    });
+    document.getElementById('in_notes').value = allNotes.join(' / ');
+    document.getElementById('in_extra_notes').value = allExtraNotes.join(' / ');
+  } else {
+    entryNoteEl.innerHTML = `<strong style="color:var(--accent)">Savaitės režimas</strong> — įvedi SAVAITĖS sumas`;
+    const week = getWeek(currentWeek);
+    ENTRY_FIELDS.forEach(f => {
+      const el = document.getElementById('in_'+f);
+      if (el) el.value = week[f] || '';
+    });
+    document.getElementById('in_extra_notes').value = week.extra_notes || '';
+    document.getElementById('in_notes').value = week.notes || '';
+  }
 }
 
 function saveCurrent() {
-  const week = getWeek(currentWeek);
-  const fields = [
-    'rl_instagram','rl_email','rl_influencer','rl_meta','rl_tiktok','rl_blog','rl_direct','rl_count',
-    'photo_shopify','photo_cash','beribu_card','beribu_cash',
-    'ads_meta','ads_tiktok','ads_google','retoucher','buhaltere','extra',
-    'codes_sent','reviews','outreach'
-  ];
-  fields.forEach(f => {
-    const el = document.getElementById('in_'+f);
-    if (el) week[f] = parseFloat(el.value) || 0;
-  });
-  week.extra_notes = document.getElementById('in_extra_notes').value;
-  week.notes = document.getElementById('in_notes').value;
+  if (currentPeriod === 'month') {
+    // Save as a single "month entry" — we use the FIRST week of the month as the storage location
+    const weekKeys = getWeeksInMonth(currentMonth);
+    if (weekKeys.length === 0) return;
+
+    // Clear all weeks of this month to avoid double-counting
+    weekKeys.forEach(wk => {
+      if (data.weeks[wk]) {
+        ENTRY_FIELDS.forEach(f => { data.weeks[wk][f] = 0; });
+        data.weeks[wk].notes = '';
+        data.weeks[wk].extra_notes = '';
+      }
+    });
+
+    // Put everything in the first week
+    const firstWeek = getWeek(weekKeys[0]);
+    ENTRY_FIELDS.forEach(f => {
+      const el = document.getElementById('in_'+f);
+      if (el) firstWeek[f] = parseFloat(el.value) || 0;
+    });
+    firstWeek.extra_notes = document.getElementById('in_extra_notes').value;
+    firstWeek.notes = document.getElementById('in_notes').value;
+    firstWeek._monthEntry = true;
+  } else {
+    const week = getWeek(currentWeek);
+    ENTRY_FIELDS.forEach(f => {
+      const el = document.getElementById('in_'+f);
+      if (el) week[f] = parseFloat(el.value) || 0;
+    });
+    week.extra_notes = document.getElementById('in_extra_notes').value;
+    week.notes = document.getElementById('in_notes').value;
+  }
   saveData();
   showSaveToast();
 }
@@ -1740,11 +1972,35 @@ function showSaveToast() {
 
 function refreshHistory() {
   const sortedWeeks = Object.keys(data.weeks).sort().reverse();
+
+  // Build months data
+  const months = {};
+  sortedWeeks.forEach(wk => {
+    const dates = getWeekDates(wk);
+    const monthKey = `${dates.start.getUTCFullYear()}-${String(dates.start.getUTCMonth()+1).padStart(2,'0')}`;
+    if (!months[monthKey]) {
+      months[monthKey] = {
+        income: 0, rl: 0, expenses: 0, count: 0,
+        rl_instagram:0, rl_email:0, rl_influencer:0, rl_meta:0, rl_tiktok:0, rl_blog:0, rl_direct:0,
+        photo_shopify:0, photo_cash:0, beribu_card:0, beribu_cash:0
+      };
+    }
+    const w = data.weeks[wk];
+    months[monthKey].income += calcWeekIncome(w);
+    months[monthKey].rl += calcRetouchLab(w);
+    months[monthKey].expenses += calcWeekExpenses(w);
+    months[monthKey].count++;
+    ['rl_instagram','rl_email','rl_influencer','rl_meta','rl_tiktok','rl_blog','rl_direct',
+     'photo_shopify','photo_cash','beribu_card','beribu_cash'].forEach(k => {
+      months[monthKey][k] += w[k] || 0;
+    });
+  });
+
   if (sortedWeeks.length === 0) {
     document.getElementById('historyList').innerHTML = `
       <div class="empty">
         <div class="emoji">📊</div>
-        <div class="title">Dar nėra įvestų savaičių</div>
+        <div class="title">Dar nėra įvestų duomenų</div>
         <div class="desc">Įvedi pirmus duomenis ir matysi istoriją čia.</div>
       </div>
     `;
@@ -1752,59 +2008,106 @@ function refreshHistory() {
     return;
   }
 
-  const html = sortedWeeks.map(wk => {
-    const week = data.weeks[wk];
-    const income = calcWeekIncome(week);
-    const expenses = calcWeekExpenses(week);
-    const profit = income - expenses;
-    const rl = calcRetouchLab(week);
-    const dates = getWeekDates(wk);
-    const wnum = wk.split('-W')[1];
-    return `
-      <div class="history-row" onclick="currentWeek='${wk}'; showPage('overview');">
-        <div class="history-week">
-          <div class="num">${wnum}</div>
-          <div class="lbl">savaitė</div>
+  // ── PRIMARY VIEW: depends on period ──
+  if (currentPeriod === 'month') {
+    // Show months in main list with FULL breakdown
+    const monthNames = ['Sausis','Vasaris','Kovas','Balandis','Gegužė','Birželis','Liepa','Rugpjūtis','Rugsėjis','Spalis','Lapkritis','Gruodis'];
+    const monthEntries = Object.entries(months).sort().reverse();
+    const monthsHtml = monthEntries.map(([mk, m]) => {
+      const [year, month] = mk.split('-');
+      const profit = m.income - (m.expenses + data.recurringExpenses.reduce((s,e)=>s+e.amount, 0));
+      const photo = m.photo_shopify + m.photo_cash;
+      const beribu = m.beribu_card + m.beribu_cash;
+      return `
+        <div class="history-row" onclick="currentMonth='${mk}'; showPage('overview');" style="display:block; padding:16px;">
+          <div style="display:flex; align-items:center; gap:14px; margin-bottom:10px;">
+            <div class="history-week">
+              <div class="num">${monthNames[parseInt(month)-1].slice(0,3)}</div>
+              <div class="lbl">${year}</div>
+            </div>
+            <div class="history-info">
+              <div class="history-amount">${fmt(m.income)}€</div>
+              <div class="history-sub">Pajamos · ${m.count} sav.</div>
+            </div>
+            <div class="history-pill ${profit >= 0 ? 'profit' : 'loss'}">
+              ${profit >= 0 ? '+' : ''}${fmt(profit)}€
+            </div>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; padding-top:10px; border-top:1px solid var(--border);">
+            <div>
+              <div style="font-size:9px; color:var(--text3); font-weight:700; text-transform:uppercase; letter-spacing:0.4px;">RetouchLab</div>
+              <div style="font-family:'Archivo Black',sans-serif; font-size:14px; color:var(--accent); margin-top:2px;">${fmt(m.rl)}€</div>
+            </div>
+            <div>
+              <div style="font-size:9px; color:var(--text3); font-weight:700; text-transform:uppercase; letter-spacing:0.4px;">Foto</div>
+              <div style="font-family:'Archivo Black',sans-serif; font-size:14px; color:var(--text); margin-top:2px;">${fmt(photo)}€</div>
+            </div>
+            <div>
+              <div style="font-size:9px; color:var(--text3); font-weight:700; text-transform:uppercase; letter-spacing:0.4px;">Beribu</div>
+              <div style="font-family:'Archivo Black',sans-serif; font-size:14px; color:var(--text); margin-top:2px;">${fmt(beribu)}€</div>
+            </div>
+          </div>
         </div>
-        <div class="history-info">
-          <div class="history-amount">${fmt(income)}€</div>
-          <div class="history-sub">${formatDate(dates.start)}–${formatDate(dates.end)} · RL ${fmt(rl)}€</div>
-        </div>
-        <div class="history-pill ${profit >= 0 ? 'profit' : 'loss'}">
-          ${profit >= 0 ? '+' : ''}${fmt(profit)}€
-        </div>
-      </div>
-    `;
-  }).join('');
-  document.getElementById('historyList').innerHTML = html;
+      `;
+    }).join('');
+    document.getElementById('historyList').innerHTML = monthsHtml;
+    document.getElementById('monthsList').innerHTML = '';
 
-  // Months summary
-  const months = {};
-  sortedWeeks.forEach(wk => {
-    const dates = getWeekDates(wk);
-    const monthKey = `${dates.start.getUTCFullYear()}-${String(dates.start.getUTCMonth()+1).padStart(2,'0')}`;
-    if (!months[monthKey]) months[monthKey] = {income: 0, rl: 0, count: 0};
-    months[monthKey].income += calcWeekIncome(data.weeks[wk]);
-    months[monthKey].rl += calcRetouchLab(data.weeks[wk]);
-    months[monthKey].count++;
-  });
-  const monthNames = ['Sausis','Vasaris','Kovas','Balandis','Gegužė','Birželis','Liepa','Rugpjūtis','Rugsėjis','Spalis','Lapkritis','Gruodis'];
-  const monthsHTML = Object.entries(months).sort().reverse().map(([mk, m]) => {
-    const [year, month] = mk.split('-');
-    return `
-      <div class="history-row">
-        <div class="history-week">
-          <div class="num">${monthNames[parseInt(month)-1].slice(0,3)}</div>
-          <div class="lbl">${year}</div>
+    // Update section title
+    const sectionTitles = document.querySelectorAll('#page-history .section-title');
+    if (sectionTitles[0]) sectionTitles[0].textContent = 'Visi mėnesiai';
+    if (sectionTitles[1]) sectionTitles[1].textContent = '';
+  } else {
+    // Show weeks in main list
+    const weeksHtml = sortedWeeks.map(wk => {
+      const week = data.weeks[wk];
+      const income = calcWeekIncome(week);
+      const expenses = calcWeekExpenses(week);
+      const profit = income - expenses;
+      const rl = calcRetouchLab(week);
+      const dates = getWeekDates(wk);
+      const wnum = wk.split('-W')[1];
+      return `
+        <div class="history-row" onclick="currentWeek='${wk}'; showPage('overview');">
+          <div class="history-week">
+            <div class="num">${wnum}</div>
+            <div class="lbl">savaitė</div>
+          </div>
+          <div class="history-info">
+            <div class="history-amount">${fmt(income)}€</div>
+            <div class="history-sub">${formatDate(dates.start)}–${formatDate(dates.end)} · RL ${fmt(rl)}€</div>
+          </div>
+          <div class="history-pill ${profit >= 0 ? 'profit' : 'loss'}">
+            ${profit >= 0 ? '+' : ''}${fmt(profit)}€
+          </div>
         </div>
-        <div class="history-info">
-          <div class="history-amount">${fmt(m.income)}€</div>
-          <div class="history-sub">${m.count} sav. · RL ${fmt(m.rl)}€</div>
+      `;
+    }).join('');
+    document.getElementById('historyList').innerHTML = weeksHtml;
+
+    // Months as secondary
+    const monthNames = ['Sausis','Vasaris','Kovas','Balandis','Gegužė','Birželis','Liepa','Rugpjūtis','Rugsėjis','Spalis','Lapkritis','Gruodis'];
+    const monthsHTML = Object.entries(months).sort().reverse().map(([mk, m]) => {
+      const [year, month] = mk.split('-');
+      return `
+        <div class="history-row" onclick="currentMonth='${mk}'; setPeriod('month');">
+          <div class="history-week">
+            <div class="num">${monthNames[parseInt(month)-1].slice(0,3)}</div>
+            <div class="lbl">${year}</div>
+          </div>
+          <div class="history-info">
+            <div class="history-amount">${fmt(m.income)}€</div>
+            <div class="history-sub">${m.count} sav. · RL ${fmt(m.rl)}€</div>
+          </div>
         </div>
-      </div>
-    `;
-  }).join('');
-  document.getElementById('monthsList').innerHTML = monthsHTML;
+      `;
+    }).join('');
+    document.getElementById('monthsList').innerHTML = monthsHTML;
+
+    const sectionTitles = document.querySelectorAll('#page-history .section-title');
+    if (sectionTitles[0]) sectionTitles[0].textContent = 'Visos savaitės';
+    if (sectionTitles[1]) sectionTitles[1].textContent = 'Mėnesių suvestinė';
+  }
 }
 
 function refreshSettings() {
