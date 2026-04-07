@@ -1465,6 +1465,7 @@ function refreshInsights2() {
     loadAnalyticsFromGitHub();
   } else {
     renderInsights();
+    document.getElementById('insLoadingState').style.display = 'none';
   }
 }
 
@@ -1480,25 +1481,72 @@ function renderInsights() {
   if (!analyticsData) return;
   const d = analyticsData;
 
-  // Hero
-  document.getElementById('insUsers').textContent = (d.last30Days?.users || 0).toLocaleString('lt-LT');
-  document.getElementById('insSessions').textContent = (d.last30Days?.sessions || 0).toLocaleString('lt-LT');
-  document.getElementById('insPageviews').textContent = (d.last30Days?.pageviews || 0).toLocaleString('lt-LT');
-  document.getElementById('insLastUpdated').textContent = 'Atnaujinta: ' + (d.lastUpdated || '—');
-
-  // This week
-  document.getElementById('insWeekUsers').textContent = d.thisWeek?.users || 0;
-  if (d.lastWeek?.users) {
-    const delta = (d.thisWeek?.users || 0) - d.lastWeek.users;
-    document.getElementById('insWeekDelta').textContent =
-      `${delta >= 0 ? '+' : ''}${delta} vs pereitą sav.`;
+  // Determine which dataset to show based on current period + nav
+  let periodData = null;
+  let periodLabel = '';
+  if (currentPeriod === 'week') {
+    periodData = (d.weeklyBreakdown || {})[currentWeek];
+    const dates = getWeekDates(currentWeek);
+    periodLabel = `${formatDate(dates.start)} – ${formatDate(dates.end)}`;
+  } else {
+    periodData = (d.monthlyBreakdown || {})[currentMonth];
+    periodLabel = getMonthName(currentMonth);
   }
 
-  // Buy clicks (from key events)
+  // Fallback to last 30 days if no specific period data
+  const useFallback = !periodData;
+  if (useFallback) {
+    periodData = {
+      users: d.last30Days?.users || 0,
+      sessions: d.last30Days?.sessions || 0,
+      pageviews: d.last30Days?.pageviews || 0,
+      sources: d.trafficSources || [],
+      countries: d.countries || [],
+      devices: d.devices || [],
+      keyEvents: d.keyEvents || []
+    };
+    periodLabel = '30 dienų (nėra duomenų pasirinktam laikotarpiui)';
+  }
+
+  // Hero
+  document.querySelector('#page-insights .hero-card .hero-label').textContent =
+    currentPeriod === 'week' ? `Lankytojai (${periodLabel})` : `Lankytojai (${periodLabel})`;
+  document.getElementById('insUsers').textContent = (periodData.users || 0).toLocaleString('lt-LT');
+  document.getElementById('insSessions').textContent = (periodData.sessions || 0).toLocaleString('lt-LT');
+  document.getElementById('insPageviews').textContent = (periodData.pageviews || 0).toLocaleString('lt-LT');
+  document.getElementById('insLastUpdated').textContent = 'Atnaujinta: ' + (d.lastUpdated || '—');
+
+  // Period delta vs previous
+  let prevData = null;
+  if (currentPeriod === 'week') {
+    const dates = getWeekDates(currentWeek);
+    const prevDate = new Date(dates.start);
+    prevDate.setUTCDate(prevDate.getUTCDate() - 7);
+    const prevKey = getWeekKey(prevDate);
+    prevData = (d.weeklyBreakdown || {})[prevKey];
+  } else {
+    const dates = getMonthDates(currentMonth);
+    const prevDate = new Date(dates.start);
+    prevDate.setUTCMonth(prevDate.getUTCMonth() - 1);
+    const prevKey = getMonthKey(prevDate);
+    prevData = (d.monthlyBreakdown || {})[prevKey];
+  }
+
+  document.getElementById('insWeekUsers').textContent = periodData.users || 0;
+  if (prevData?.users) {
+    const delta = (periodData.users || 0) - prevData.users;
+    const periodWord = currentPeriod === 'week' ? 'sav.' : 'mėn.';
+    document.getElementById('insWeekDelta').textContent =
+      `${delta >= 0 ? '+' : ''}${delta} vs pereitą ${periodWord}`;
+  } else {
+    document.getElementById('insWeekDelta').textContent = '— pirmas';
+  }
+
+  // Buy clicks (from key events of selected period)
   let buyClicks = 0;
   let buyUsers = 0;
-  let totalUsers = d.last30Days?.users || 0;
-  (d.keyEvents || []).forEach(e => {
+  let totalUsers = periodData.users || 0;
+  (periodData.keyEvents || []).forEach(e => {
     if (e.event.toLowerCase().includes('buy') || e.event.toLowerCase().includes('checkout')) {
       buyClicks += e.count;
       buyUsers += e.users;
@@ -1508,12 +1556,14 @@ function renderInsights() {
   if (totalUsers > 0) {
     document.getElementById('insBuyConv').textContent =
       `${(buyUsers / totalUsers * 100).toFixed(1)}% lankytojų`;
+  } else {
+    document.getElementById('insBuyConv').textContent = '—';
   }
 
-  // Sources
-  const sourcesHtml = (d.trafficSources || []).slice(0, 10).map(s => {
-    const total = d.last30Days?.sessions || 1;
-    const pct = (s.sessions / total * 100).toFixed(0);
+  // Sources from period data
+  const totalSessions = periodData.sessions || 1;
+  const sourcesHtml = (periodData.sources || []).slice(0, 10).map(s => {
+    const pct = (s.sessions / totalSessions * 100).toFixed(0);
     let icon = '🔗';
     if (s.source.includes('instagram') || s.source === 'ig') icon = '📷';
     else if (s.source.includes('facebook')) icon = '👥';
@@ -1532,29 +1582,29 @@ function renderInsights() {
       </div>
     `;
   }).join('');
-  document.getElementById('insSources').innerHTML = sourcesHtml;
+  document.getElementById('insSources').innerHTML = sourcesHtml || '<div class="empty"><div class="desc">Nėra duomenų</div></div>';
 
-  // Countries
+  // Countries from period data
   const flagMap = { 'Lithuania': '🇱🇹', 'United States': '🇺🇸', 'Germany': '🇩🇪', 'United Kingdom': '🇬🇧',
                     'Netherlands': '🇳🇱', 'Denmark': '🇩🇰', 'Singapore': '🇸🇬', 'Canada': '🇨🇦',
                     'Italy': '🇮🇹', 'France': '🇫🇷', 'Spain': '🇪🇸', 'Poland': '🇵🇱' };
-  const countriesHtml = (d.countries || []).map(c => `
+  const countriesHtml = (periodData.countries || []).map(c => `
     <div class="source-row">
       <div class="source-icon">${flagMap[c.country] || '🌍'}</div>
       <div class="source-info">
         <div class="source-name">${c.country}</div>
-        <div class="source-meta">${c.sessions} sesijos</div>
+        <div class="source-meta">${c.users} lankytojai</div>
       </div>
       <div class="source-amount">${c.users}</div>
     </div>
   `).join('');
-  document.getElementById('insCountries').innerHTML = countriesHtml;
+  document.getElementById('insCountries').innerHTML = countriesHtml || '<div class="empty"><div class="desc">Nėra duomenų</div></div>';
 
-  // Devices
+  // Devices from period data
   const devIcons = { 'mobile': '📱', 'desktop': '🖥️', 'tablet': '📱' };
-  const devicesHtml = (d.devices || []).map(dev => {
-    const total = d.last30Days?.users || 1;
-    const pct = (dev.users / total * 100).toFixed(0);
+  const totalDevUsers = (periodData.devices || []).reduce((s,d) => s + (d.users||0), 0) || 1;
+  const devicesHtml = (periodData.devices || []).map(dev => {
+    const pct = (dev.users / totalDevUsers * 100).toFixed(0);
     return `
       <div class="source-row">
         <div class="source-icon">${devIcons[dev.device] || '💻'}</div>
@@ -1566,9 +1616,9 @@ function renderInsights() {
       </div>
     `;
   }).join('');
-  document.getElementById('insDevices').innerHTML = devicesHtml;
+  document.getElementById('insDevices').innerHTML = devicesHtml || '<div class="empty"><div class="desc">Nėra duomenų</div></div>';
 
-  // Top pages
+  // Top pages (still last 30 days — too granular per week)
   const topPagesHtml = (d.topPages || []).slice(0, 10).map(p => `
     <div class="source-row">
       <div class="source-icon">📄</div>
