@@ -975,6 +975,7 @@ const DEFAULT_RECURRING = [
 
 const DEFAULT_DATA = {
   weeks: {},
+  months: {}, // Separate storage for monthly entries
   recurringExpenses: DEFAULT_RECURRING,
   goals: {
     retouchlab_monthly: 5000,
@@ -995,10 +996,32 @@ function loadData() {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       const parsed = JSON.parse(stored);
+      // Ensure months object exists
+      if (!parsed.months) parsed.months = {};
       return {...DEFAULT_DATA, ...parsed};
     }
   } catch(e) { console.error(e); }
   return JSON.parse(JSON.stringify(DEFAULT_DATA));
+}
+
+function emptyMonth() {
+  return {
+    rl_instagram: 0, rl_email: 0, rl_influencer: 0,
+    rl_meta: 0, rl_tiktok: 0, rl_blog: 0, rl_direct: 0, rl_count: 0,
+    photo_shopify: 0, photo_cash: 0,
+    beribu_card: 0, beribu_cash: 0,
+    ads_meta: 0, ads_tiktok: 0, ads_google: 0,
+    retoucher: 0, buhaltere: 0, extra: 0, extra_notes: '',
+    codes_sent: 0, reviews: 0, outreach: 0,
+    notes: ''
+  };
+}
+
+function getMonth(monthKey) {
+  if (!data.months[monthKey]) {
+    data.months[monthKey] = emptyMonth();
+  }
+  return data.months[monthKey];
 }
 
 function saveData() {
@@ -1028,15 +1051,37 @@ async function loadFromGitHub() {
     const fileData = await res.json();
     ghFinanceSha = fileData.sha;
     const content = JSON.parse(decodeURIComponent(escape(atob(fileData.content))));
-    // Merge: prefer GitHub if newer (compare lastUpdated timestamps)
+    // Smart merge: combine local + remote (newest wins per field)
     const localUpdated = data.lastUpdated || 0;
     const remoteUpdated = content.lastUpdated || 0;
+
+    // Always merge weeks/months — prefer the side with more data per key
+    const mergedWeeks = {...(content.weeks || {}), ...(data.weeks || {})};
+    const mergedMonths = {...(content.months || {}), ...(data.months || {})};
+
     if (remoteUpdated > localUpdated) {
+      // Remote is newer — use remote as base but keep ANY local entries that don't exist remotely
       data = {...DEFAULT_DATA, ...content};
+      data.weeks = mergedWeeks;
+      data.months = mergedMonths;
+      // Local override remote on weeks/months that exist in both (local edits not yet pushed)
+      Object.keys(data.weeks || {}).forEach(k => {
+        if ((content.weeks || {})[k] && data.weeks[k] && JSON.stringify(content.weeks[k]) !== JSON.stringify(data.weeks[k])) {
+          // Conflict — prefer the side with more non-zero fields
+          const remoteFields = Object.values(content.weeks[k] || {}).filter(v => v && v !== 0).length;
+          const localFields = Object.values(data.weeks[k] || {}).filter(v => v && v !== 0).length;
+          data.weeks[k] = localFields >= remoteFields ? data.weeks[k] : content.weeks[k];
+        }
+      });
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
       refreshAll();
       showSyncStatus('Atnaujinta iš GitHub ✓');
     } else {
+      // Local is newer or equal — keep local but pull in any new weeks/months from remote
+      data.weeks = mergedWeeks;
+      data.months = mergedMonths;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      refreshAll();
       showSyncStatus('Sinchronizuota ✓');
     }
   } catch(e) {
@@ -1202,6 +1247,7 @@ function getWeeksInMonth(monthKey) {
 }
 
 // Aggregate income/expense data over a month
+// Sums BOTH per-week entries AND the monthly entry (data.months[monthKey])
 function getMonthAggregate(monthKey) {
   const weekKeys = getWeeksInMonth(monthKey);
   const agg = {
@@ -1213,6 +1259,7 @@ function getMonthAggregate(monthKey) {
     retoucher:0, buhaltere:0, extra:0,
     codes_sent:0, reviews:0, outreach:0,
   };
+  // Sum per-week entries
   weekKeys.forEach(wk => {
     const w = data.weeks[wk];
     if (!w) return;
@@ -1220,6 +1267,13 @@ function getMonthAggregate(monthKey) {
       agg[k] += w[k] || 0;
     });
   });
+  // Add monthly entry (if any)
+  const m = data.months && data.months[monthKey];
+  if (m) {
+    Object.keys(agg).forEach(k => {
+      agg[k] += m[k] || 0;
+    });
+  }
   return agg;
 }
 
@@ -1896,24 +1950,16 @@ function refreshEntry() {
   }
 
   if (currentPeriod === 'month') {
-    entryNoteEl.innerHTML = `<strong style="color:var(--accent)">Mėnesio režimas</strong> — įvedi MĖNESIO sumas. ${getMonthName(currentMonth)}`;
+    entryNoteEl.innerHTML = `<strong style="color:var(--accent)">Mėnesio režimas</strong> — įvedi MĖNESIO sumas. ${getMonthName(currentMonth)}<br><span style="font-size:10px;color:var(--text3);">Saugoma atskirai nuo savaitės įvedimo</span>`;
 
-    // Aggregate all weeks for this month and show in form
-    const agg = getMonthAggregate(currentMonth);
+    // Load monthly entry directly (NOT aggregated from weeks)
+    const month = getMonth(currentMonth);
     ENTRY_FIELDS.forEach(f => {
       const el = document.getElementById('in_'+f);
-      if (el) el.value = agg[f] || '';
+      if (el) el.value = month[f] || '';
     });
-    // Notes — concatenate weeks notes
-    const weekKeys = getWeeksInMonth(currentMonth);
-    let allNotes = [];
-    let allExtraNotes = [];
-    weekKeys.forEach(wk => {
-      if (data.weeks[wk]?.notes) allNotes.push(data.weeks[wk].notes);
-      if (data.weeks[wk]?.extra_notes) allExtraNotes.push(data.weeks[wk].extra_notes);
-    });
-    document.getElementById('in_notes').value = allNotes.join(' / ');
-    document.getElementById('in_extra_notes').value = allExtraNotes.join(' / ');
+    document.getElementById('in_notes').value = month.notes || '';
+    document.getElementById('in_extra_notes').value = month.extra_notes || '';
   } else {
     entryNoteEl.innerHTML = `<strong style="color:var(--accent)">Savaitės režimas</strong> — įvedi SAVAITĖS sumas`;
     const week = getWeek(currentWeek);
@@ -1928,28 +1974,14 @@ function refreshEntry() {
 
 function saveCurrent() {
   if (currentPeriod === 'month') {
-    // Save as a single "month entry" — we use the FIRST week of the month as the storage location
-    const weekKeys = getWeeksInMonth(currentMonth);
-    if (weekKeys.length === 0) return;
-
-    // Clear all weeks of this month to avoid double-counting
-    weekKeys.forEach(wk => {
-      if (data.weeks[wk]) {
-        ENTRY_FIELDS.forEach(f => { data.weeks[wk][f] = 0; });
-        data.weeks[wk].notes = '';
-        data.weeks[wk].extra_notes = '';
-      }
-    });
-
-    // Put everything in the first week
-    const firstWeek = getWeek(weekKeys[0]);
+    // Save to the SEPARATE monthly entries store (NOT touching weeks)
+    const month = getMonth(currentMonth);
     ENTRY_FIELDS.forEach(f => {
       const el = document.getElementById('in_'+f);
-      if (el) firstWeek[f] = parseFloat(el.value) || 0;
+      if (el) month[f] = parseFloat(el.value) || 0;
     });
-    firstWeek.extra_notes = document.getElementById('in_extra_notes').value;
-    firstWeek.notes = document.getElementById('in_notes').value;
-    firstWeek._monthEntry = true;
+    month.extra_notes = document.getElementById('in_extra_notes').value;
+    month.notes = document.getElementById('in_notes').value;
   } else {
     const week = getWeek(currentWeek);
     ENTRY_FIELDS.forEach(f => {
