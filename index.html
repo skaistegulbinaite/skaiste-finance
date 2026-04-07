@@ -789,6 +789,88 @@ body {
 
 </div>
 
+<!-- ============ PAGE: INSIGHTS (Traffic + Search) ============ -->
+<div class="page" id="page-insights">
+
+  <div class="hero-card" style="background:linear-gradient(135deg, #2e1a20 0%, #3d2229 100%);">
+    <div class="hero-label">Lankytojai (30 dienų)</div>
+    <div class="hero-amount" id="insUsers">—</div>
+    <div class="hero-sub">
+      <span><strong id="insSessions">—</strong> sesijos</span>
+      <span><strong id="insPageviews">—</strong> peržiūros</span>
+    </div>
+    <div class="hero-delta flat" id="insLastUpdated">Atnaujinta: —</div>
+  </div>
+
+  <div class="metric-grid">
+    <div class="metric-card retouchlab">
+      <div class="label">Šią savaitę</div>
+      <div class="value">€<span id="insWeekUsers">—</span></div>
+      <div class="sub" id="insWeekDelta">—</div>
+    </div>
+    <div class="metric-card profit">
+      <div class="label">Pirko mygtuką paspaudė</div>
+      <div class="value" id="insBuyClicks">—</div>
+      <div class="sub" id="insBuyConv">—</div>
+    </div>
+  </div>
+
+  <div class="section-header">
+    <div class="section-title">Iš kur ateina lankytojai</div>
+    <button class="section-action" onclick="refreshInsightsData()">↻ Atnaujinti</button>
+  </div>
+
+  <div class="source-list" id="insSources"></div>
+
+  <div class="section-header">
+    <div class="section-title">Šalys</div>
+  </div>
+  <div class="source-list" id="insCountries"></div>
+
+  <div class="section-header">
+    <div class="section-title">Įrenginiai</div>
+  </div>
+  <div class="source-list" id="insDevices"></div>
+
+  <div class="section-header">
+    <div class="section-title">Top puslapiai (lankytojai)</div>
+  </div>
+  <div class="source-list" id="insTopPages"></div>
+
+  <div class="section-header">
+    <div class="section-title">Google paieška — santrauka</div>
+  </div>
+  <div class="metric-grid">
+    <div class="metric-card income">
+      <div class="label">Klikai</div>
+      <div class="value" id="insSearchClicks">—</div>
+      <div class="sub">iš Google</div>
+    </div>
+    <div class="metric-card income">
+      <div class="label">Parodymai</div>
+      <div class="value" id="insSearchImpressions">—</div>
+      <div class="sub">CTR <span id="insSearchCTR">—</span></div>
+    </div>
+  </div>
+
+  <div class="section-header">
+    <div class="section-title">Ką žmonės guglina (Top užklausos)</div>
+  </div>
+  <div class="source-list" id="insSearchQueries"></div>
+
+  <div class="section-header">
+    <div class="section-title">SEO puslapių status</div>
+  </div>
+  <div class="source-list" id="insSearchPages"></div>
+
+  <div id="insLoadingState" class="empty">
+    <div class="emoji">📊</div>
+    <div class="title">Krauname duomenis...</div>
+    <div class="desc">Atsisiunčiame iš GitHub</div>
+  </div>
+
+</div>
+
 <!-- BOTTOM NAV -->
 <nav class="nav">
   <button class="nav-btn active" data-page="overview" onclick="showPage('overview')">
@@ -802,6 +884,10 @@ body {
   <button class="nav-btn" data-page="entry" onclick="showPage('entry')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
     Įvesti
+  </button>
+  <button class="nav-btn" data-page="insights" onclick="showPage('insights')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 4 4 5-5"/></svg>
+    Insights
   </button>
   <button class="nav-btn" data-page="history" onclick="showPage('history')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
@@ -1134,6 +1220,7 @@ function showPage(page) {
     overview: 'Apžvalga',
     retouchlab: 'RetouchLab',
     entry: 'Įvesti',
+    insights: 'Insights',
     history: 'Istorija',
     settings: 'Nustatymai'
   };
@@ -1159,8 +1246,192 @@ function refreshAll() {
   if (currentPage === 'overview') refreshOverview();
   if (currentPage === 'retouchlab') refreshRetouchLab();
   if (currentPage === 'entry') refreshEntry();
+  if (currentPage === 'insights') refreshInsights2();
   if (currentPage === 'history') refreshHistory();
   if (currentPage === 'settings') refreshSettings();
+}
+
+// ============ INSIGHTS PAGE (GA4 + Search Console) ============
+let analyticsData = null;
+
+async function loadAnalyticsFromGitHub() {
+  if (!ghToken) {
+    document.getElementById('insLoadingState').innerHTML =
+      '<div class="emoji">🔒</div><div class="title">Reikia GitHub token</div><div class="desc">Eik į Nustatymai → Sinchronizacija</div>';
+    return;
+  }
+  try {
+    const res = await fetch(`https://api.github.com/repos/skaistegulbinaite/skaiste-finance-data/contents/analytics-data.json`, {
+      headers: { 'Authorization': `token ${ghToken}`, 'Accept': 'application/vnd.github.v3+json' }
+    });
+    if (!res.ok) {
+      document.getElementById('insLoadingState').innerHTML =
+        '<div class="emoji">📊</div><div class="title">Dar nėra duomenų</div><div class="desc">Pasakyk Claude paleisti analytics_sync.py</div>';
+      return;
+    }
+    const fileData = await res.json();
+    analyticsData = JSON.parse(decodeURIComponent(escape(atob(fileData.content))));
+    document.getElementById('insLoadingState').style.display = 'none';
+    renderInsights();
+  } catch(e) {
+    console.log('Analytics load failed:', e);
+    document.getElementById('insLoadingState').innerHTML =
+      '<div class="emoji">⚠️</div><div class="title">Klaida kraunant</div><div class="desc">' + e.message + '</div>';
+  }
+}
+
+function refreshInsights2() {
+  if (!analyticsData) {
+    loadAnalyticsFromGitHub();
+  } else {
+    renderInsights();
+  }
+}
+
+function refreshInsightsData() {
+  analyticsData = null;
+  document.getElementById('insLoadingState').style.display = 'block';
+  document.getElementById('insLoadingState').innerHTML =
+    '<div class="emoji">📊</div><div class="title">Krauname duomenis...</div><div class="desc">Atsisiunčiame iš GitHub</div>';
+  loadAnalyticsFromGitHub();
+}
+
+function renderInsights() {
+  if (!analyticsData) return;
+  const d = analyticsData;
+
+  // Hero
+  document.getElementById('insUsers').textContent = (d.last30Days?.users || 0).toLocaleString('lt-LT');
+  document.getElementById('insSessions').textContent = (d.last30Days?.sessions || 0).toLocaleString('lt-LT');
+  document.getElementById('insPageviews').textContent = (d.last30Days?.pageviews || 0).toLocaleString('lt-LT');
+  document.getElementById('insLastUpdated').textContent = 'Atnaujinta: ' + (d.lastUpdated || '—');
+
+  // This week
+  document.getElementById('insWeekUsers').textContent = d.thisWeek?.users || 0;
+  if (d.lastWeek?.users) {
+    const delta = (d.thisWeek?.users || 0) - d.lastWeek.users;
+    document.getElementById('insWeekDelta').textContent =
+      `${delta >= 0 ? '+' : ''}${delta} vs pereitą sav.`;
+  }
+
+  // Buy clicks (from key events)
+  let buyClicks = 0;
+  let buyUsers = 0;
+  let totalUsers = d.last30Days?.users || 0;
+  (d.keyEvents || []).forEach(e => {
+    if (e.event.toLowerCase().includes('buy') || e.event.toLowerCase().includes('checkout')) {
+      buyClicks += e.count;
+      buyUsers += e.users;
+    }
+  });
+  document.getElementById('insBuyClicks').textContent = buyClicks;
+  if (totalUsers > 0) {
+    document.getElementById('insBuyConv').textContent =
+      `${(buyUsers / totalUsers * 100).toFixed(1)}% lankytojų`;
+  }
+
+  // Sources
+  const sourcesHtml = (d.trafficSources || []).slice(0, 10).map(s => {
+    const total = d.last30Days?.sessions || 1;
+    const pct = (s.sessions / total * 100).toFixed(0);
+    let icon = '🔗';
+    if (s.source.includes('instagram') || s.source === 'ig') icon = '📷';
+    else if (s.source.includes('facebook')) icon = '👥';
+    else if (s.source.includes('google')) icon = '🔍';
+    else if (s.source.includes('klaviyo') || s.medium === 'email') icon = '📧';
+    else if (s.source === '(direct)') icon = '🌐';
+    else if (s.source.includes('chatgpt')) icon = '🤖';
+    return `
+      <div class="source-row">
+        <div class="source-icon">${icon}</div>
+        <div class="source-info">
+          <div class="source-name">${s.source}</div>
+          <div class="source-meta">${s.medium} · ${pct}%</div>
+        </div>
+        <div class="source-amount">${s.sessions}</div>
+      </div>
+    `;
+  }).join('');
+  document.getElementById('insSources').innerHTML = sourcesHtml;
+
+  // Countries
+  const flagMap = { 'Lithuania': '🇱🇹', 'United States': '🇺🇸', 'Germany': '🇩🇪', 'United Kingdom': '🇬🇧',
+                    'Netherlands': '🇳🇱', 'Denmark': '🇩🇰', 'Singapore': '🇸🇬', 'Canada': '🇨🇦',
+                    'Italy': '🇮🇹', 'France': '🇫🇷', 'Spain': '🇪🇸', 'Poland': '🇵🇱' };
+  const countriesHtml = (d.countries || []).map(c => `
+    <div class="source-row">
+      <div class="source-icon">${flagMap[c.country] || '🌍'}</div>
+      <div class="source-info">
+        <div class="source-name">${c.country}</div>
+        <div class="source-meta">${c.sessions} sesijos</div>
+      </div>
+      <div class="source-amount">${c.users}</div>
+    </div>
+  `).join('');
+  document.getElementById('insCountries').innerHTML = countriesHtml;
+
+  // Devices
+  const devIcons = { 'mobile': '📱', 'desktop': '🖥️', 'tablet': '📱' };
+  const devicesHtml = (d.devices || []).map(dev => {
+    const total = d.last30Days?.users || 1;
+    const pct = (dev.users / total * 100).toFixed(0);
+    return `
+      <div class="source-row">
+        <div class="source-icon">${devIcons[dev.device] || '💻'}</div>
+        <div class="source-info">
+          <div class="source-name">${dev.device}</div>
+          <div class="source-meta">${pct}%</div>
+        </div>
+        <div class="source-amount">${dev.users}</div>
+      </div>
+    `;
+  }).join('');
+  document.getElementById('insDevices').innerHTML = devicesHtml;
+
+  // Top pages
+  const topPagesHtml = (d.topPages || []).slice(0, 10).map(p => `
+    <div class="source-row">
+      <div class="source-icon">📄</div>
+      <div class="source-info">
+        <div class="source-name">${p.path}</div>
+        <div class="source-meta">${p.pageviews} peržiūros</div>
+      </div>
+      <div class="source-amount">${p.users}</div>
+    </div>
+  `).join('');
+  document.getElementById('insTopPages').innerHTML = topPagesHtml;
+
+  // Search summary
+  const sc = d.search?.summary || {};
+  document.getElementById('insSearchClicks').textContent = sc.clicks || 0;
+  document.getElementById('insSearchImpressions').textContent = sc.impressions || 0;
+  document.getElementById('insSearchCTR').textContent = (sc.ctr || 0).toFixed(1) + '%';
+
+  // Search queries
+  const queriesHtml = (d.search?.topQueries || []).slice(0, 15).map(q => `
+    <div class="source-row">
+      <div class="source-icon">🔍</div>
+      <div class="source-info">
+        <div class="source-name">${q.query}</div>
+        <div class="source-meta">poz. ${q.position} · ${q.impressions} parodymai</div>
+      </div>
+      <div class="source-amount ${q.clicks === 0 ? 'empty' : ''}">${q.clicks}</div>
+    </div>
+  `).join('');
+  document.getElementById('insSearchQueries').innerHTML = queriesHtml;
+
+  // Search pages
+  const searchPagesHtml = (d.search?.topPages || []).slice(0, 12).map(p => `
+    <div class="source-row">
+      <div class="source-icon">${p.clicks > 0 ? '✅' : '⚠️'}</div>
+      <div class="source-info">
+        <div class="source-name">${p.page}</div>
+        <div class="source-meta">poz. ${p.position} · ${p.impressions} parodymai · CTR ${p.ctr}%</div>
+      </div>
+      <div class="source-amount ${p.clicks === 0 ? 'empty' : ''}">${p.clicks}</div>
+    </div>
+  `).join('');
+  document.getElementById('insSearchPages').innerHTML = searchPagesHtml;
 }
 
 function refreshOverview() {
