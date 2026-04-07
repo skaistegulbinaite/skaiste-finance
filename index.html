@@ -1006,7 +1006,20 @@ function loadData() {
       const parsed = JSON.parse(stored);
       // Ensure months object exists
       if (!parsed.months) parsed.months = {};
-      return {...DEFAULT_DATA, ...parsed};
+      const merged = {...DEFAULT_DATA, ...parsed};
+      // MIGRATION: clean up old Beribu defaults (€125/€50 per week)
+      // These were auto-seeded by old emptyWeek(). Now Beribu is monthly.
+      if (!merged._migratedBeribu) {
+        Object.keys(merged.weeks || {}).forEach(wk => {
+          const w = merged.weeks[wk];
+          if (w && w.beribu_card === 125 && w.beribu_cash === 50) {
+            w.beribu_card = 0;
+            w.beribu_cash = 0;
+          }
+        });
+        merged._migratedBeribu = true;
+      }
+      return merged;
     }
   } catch(e) { console.error(e); }
   return JSON.parse(JSON.stringify(DEFAULT_DATA));
