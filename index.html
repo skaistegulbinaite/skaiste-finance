@@ -655,15 +655,15 @@ body {
   </div>
 
   <div class="entry-section">
-    <div class="entry-section-title"><span class="dot"></span>Beribu (€)</div>
+    <div class="entry-section-title"><span class="dot"></span>Beribu (€) — paprastai mėn režimu</div>
     <div class="entry-row">
       <div class="entry-icon">💳</div>
-      <div class="entry-label">Į kortelę<span class="desc">Auto: 125€/sav (500€/mėn)</span></div>
+      <div class="entry-label">Į kortelę<span class="desc">~500€/mėn atlyginimas</span></div>
       <input class="entry-input" type="number" step="0.01" id="in_beribu_card" oninput="saveCurrent()">
     </div>
     <div class="entry-row">
       <div class="entry-icon">💵</div>
-      <div class="entry-label">Grynais<span class="desc">Auto: 50€/sav (200€/mėn)</span></div>
+      <div class="entry-label">Grynais<span class="desc">~200€/mėn</span></div>
       <input class="entry-input" type="number" step="0.01" id="in_beribu_cash" oninput="saveCurrent()">
     </div>
   </div>
@@ -1255,33 +1255,38 @@ function getWeeksInMonth(monthKey) {
 }
 
 // Aggregate income/expense data over a month
-// Sums BOTH per-week entries AND the monthly entry (data.months[monthKey])
+// PER-FIELD logic: if weekly sum > 0, use weekly; else use monthly entry
+// (avoids double-counting when user enters Beribu monthly + Shopify weekly)
 function getMonthAggregate(monthKey) {
   const weekKeys = getWeeksInMonth(monthKey);
-  const agg = {
-    rl_instagram:0, rl_email:0, rl_influencer:0, rl_meta:0,
-    rl_tiktok:0, rl_blog:0, rl_direct:0, rl_count:0,
-    photo_shopify:0, photo_cash:0,
-    beribu_card:0, beribu_cash:0,
-    ads_meta:0, ads_tiktok:0, ads_google:0,
-    retoucher:0, buhaltere:0, extra:0,
-    codes_sent:0, reviews:0, outreach:0,
-  };
-  // Sum per-week entries
-  weekKeys.forEach(wk => {
-    const w = data.weeks[wk];
-    if (!w) return;
-    Object.keys(agg).forEach(k => {
-      agg[k] += w[k] || 0;
+  const FIELDS = [
+    'rl_instagram','rl_email','rl_influencer','rl_meta',
+    'rl_tiktok','rl_blog','rl_direct','rl_count',
+    'photo_shopify','photo_cash',
+    'beribu_card','beribu_cash',
+    'ads_meta','ads_tiktok','ads_google',
+    'retoucher','buhaltere','extra',
+    'codes_sent','reviews','outreach',
+  ];
+  const agg = {};
+  FIELDS.forEach(k => { agg[k] = 0; });
+
+  const monthEntry = (data.months && data.months[monthKey]) || {};
+
+  // For each field, prefer weekly sum if any week has it, else monthly value
+  FIELDS.forEach(k => {
+    let weeklySum = 0;
+    weekKeys.forEach(wk => {
+      const w = data.weeks[wk];
+      if (w) weeklySum += w[k] || 0;
     });
+    if (weeklySum > 0) {
+      agg[k] = weeklySum;
+    } else {
+      agg[k] = monthEntry[k] || 0;
+    }
   });
-  // Add monthly entry (if any)
-  const m = data.months && data.months[monthKey];
-  if (m) {
-    Object.keys(agg).forEach(k => {
-      agg[k] += m[k] || 0;
-    });
-  }
+
   return agg;
 }
 
@@ -1309,7 +1314,7 @@ function emptyWeek() {
     rl_instagram: 0, rl_email: 0, rl_influencer: 0,
     rl_meta: 0, rl_tiktok: 0, rl_blog: 0, rl_direct: 0, rl_count: 0,
     photo_shopify: 0, photo_cash: 0,
-    beribu_card: 125, beribu_cash: 50,
+    beribu_card: 0, beribu_cash: 0,
     ads_meta: 0, ads_tiktok: 0, ads_google: 0,
     retoucher: 0, buhaltere: 0, extra: 0, extra_notes: '',
     codes_sent: 0, reviews: 0, outreach: 0,
@@ -1350,44 +1355,19 @@ function calcWeekProfit(week) {
 }
 
 function getMonthRetouchLab(weekKey) {
-  // Sum RL income for all weeks in same month as weekKey + monthly entry
+  // Use the same per-field logic as getMonthAggregate
   const dates = getWeekDates(weekKey);
-  const month = dates.start.getUTCMonth();
-  const year = dates.start.getUTCFullYear();
-  const monthKey = `${year}-${String(month+1).padStart(2,'0')}`;
-  let total = 0;
-  for (const wk in data.weeks) {
-    const wd = getWeekDates(wk);
-    if (wd.start.getUTCMonth() === month && wd.start.getUTCFullYear() === year) {
-      total += calcRetouchLab(data.weeks[wk]);
-    }
-  }
-  // Add monthly entry
-  const m = data.months && data.months[monthKey];
-  if (m) {
-    total += calcRetouchLabAgg(m);
-  }
-  return total;
+  const monthKey = `${dates.start.getUTCFullYear()}-${String(dates.start.getUTCMonth()+1).padStart(2,'0')}`;
+  const agg = getMonthAggregate(monthKey);
+  return calcRetouchLabAgg(agg);
 }
 
 function getMonthIncome(weekKey) {
+  // Use the same per-field logic
   const dates = getWeekDates(weekKey);
-  const month = dates.start.getUTCMonth();
-  const year = dates.start.getUTCFullYear();
-  const monthKey = `${year}-${String(month+1).padStart(2,'0')}`;
-  let total = 0;
-  for (const wk in data.weeks) {
-    const wd = getWeekDates(wk);
-    if (wd.start.getUTCMonth() === month && wd.start.getUTCFullYear() === year) {
-      total += calcWeekIncome(data.weeks[wk]);
-    }
-  }
-  // Add monthly entry
-  const m = data.months && data.months[monthKey];
-  if (m) {
-    total += calcMonthIncome2(m);
-  }
-  return total;
+  const monthKey = `${dates.start.getUTCFullYear()}-${String(dates.start.getUTCMonth()+1).padStart(2,'0')}`;
+  const agg = getMonthAggregate(monthKey);
+  return calcMonthIncome2(agg);
 }
 
 // ============ FORMAT ============
