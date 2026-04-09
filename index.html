@@ -881,6 +881,116 @@ body {
 
 </div>
 
+<!-- ============ PAGE: BRIEFING (Morning + Evening) ============ -->
+<div class="page" id="page-briefing">
+
+  <!-- TOGGLE Morning / Evening -->
+  <div style="display:flex; gap:0; margin-bottom:14px; background:var(--surface2); border-radius:12px; padding:3px;">
+    <button class="br-toggle-btn active" id="brToggleMorning" onclick="setBriefingKind('morning')" style="flex:1; padding:10px; background:var(--accent); color:var(--bg); border:none; border-radius:10px; font-weight:800; font-size:12px; letter-spacing:0.5px; cursor:pointer; text-transform:uppercase;">☀️ Morning</button>
+    <button class="br-toggle-btn" id="brToggleEvening" onclick="setBriefingKind('evening')" style="flex:1; padding:10px; background:transparent; color:var(--text2); border:none; border-radius:10px; font-weight:800; font-size:12px; letter-spacing:0.5px; cursor:pointer; text-transform:uppercase;">🌙 Evening</button>
+  </div>
+
+  <!-- HEADER -->
+  <div id="brHeader" class="hero-card" style="background:linear-gradient(135deg, rgba(245,198,208,0.12), rgba(232,160,184,0.03));">
+    <div class="hero-label" id="brTitle">☀️ Morning Briefing</div>
+    <div id="brHeadline" style="font-family:'Archivo Black',sans-serif; font-size:22px; line-height:1.2; margin-top:8px; color:var(--text);">—</div>
+    <div id="brSubtitle" style="font-size:11px; color:var(--text3); margin-top:6px;">—</div>
+  </div>
+
+  <!-- KEY METRICS -->
+  <div class="metric-grid">
+    <div class="metric-card retouchlab">
+      <div class="label" id="brUsersLabel">Visitors</div>
+      <div class="value"><span id="brUsers">—</span></div>
+      <div class="sub"><span id="brSessions">—</span> sessions</div>
+    </div>
+    <div class="metric-card profit">
+      <div class="label">BUY clicks</div>
+      <div class="value" id="brBuyTotal">—</div>
+      <div class="sub">€79 <span id="brBuyLifetime">—</span> · sub <span id="brBuySub">—</span></div>
+    </div>
+    <div class="metric-card income">
+      <div class="label">Pageviews</div>
+      <div class="value" id="brPageviews">—</div>
+      <div class="sub">—</div>
+    </div>
+    <div class="metric-card retouchlab">
+      <div class="label">Conversion</div>
+      <div class="value"><span id="brConv">—</span>%</div>
+      <div class="sub" id="brConvNote">—</div>
+    </div>
+  </div>
+
+  <!-- WEEK COMPARISON CHART -->
+  <div class="section-header">
+    <div class="section-title">Week Overview</div>
+    <button class="section-action" onclick="refreshBriefingData()">↻ Refresh</button>
+  </div>
+
+  <div style="background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:16px; margin-bottom:14px;">
+    <canvas id="brChart" style="max-height:200px;"></canvas>
+  </div>
+
+  <!-- WEEK TABLE -->
+  <div class="section-header">
+    <div class="section-title">This Week — Day by Day</div>
+  </div>
+  <div style="background:var(--surface); border:1px solid var(--border); border-radius:14px; overflow:hidden; margin-bottom:14px;">
+    <table id="brWeekTable" style="width:100%; border-collapse:collapse; font-size:12px;">
+      <thead>
+        <tr style="background:var(--surface2);">
+          <th style="text-align:left; padding:10px 12px; font-size:10px; color:var(--text3); text-transform:uppercase; letter-spacing:0.5px; font-weight:700;">Day</th>
+          <th style="text-align:right; padding:10px 12px; font-size:10px; color:var(--text3); text-transform:uppercase; letter-spacing:0.5px; font-weight:700;">Users</th>
+          <th style="text-align:right; padding:10px 12px; font-size:10px; color:var(--text3); text-transform:uppercase; letter-spacing:0.5px; font-weight:700;">Views</th>
+          <th style="text-align:right; padding:10px 12px; font-size:10px; color:var(--text3); text-transform:uppercase; letter-spacing:0.5px; font-weight:700;">BUY</th>
+          <th style="text-align:right; padding:10px 12px; font-size:10px; color:var(--text3); text-transform:uppercase; letter-spacing:0.5px; font-weight:700;">Conv</th>
+        </tr>
+      </thead>
+      <tbody id="brWeekTableBody"></tbody>
+      <tfoot id="brWeekTableFoot"></tfoot>
+    </table>
+  </div>
+
+  <!-- WEEK VS LAST WEEK -->
+  <div id="brWeekCompareBox" style="background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:14px 16px; margin-bottom:14px; font-size:12px;">
+    <div style="font-size:10px; color:var(--text3); text-transform:uppercase; letter-spacing:0.5px; font-weight:700; margin-bottom:6px;">vs Last Week</div>
+    <div id="brWeekCompareText" style="color:var(--text); line-height:1.5;">—</div>
+  </div>
+
+  <!-- INSIGHTS -->
+  <div class="section-header">
+    <div class="section-title">Insights & Context</div>
+  </div>
+  <div id="brInsights"></div>
+
+  <!-- ACTIONS -->
+  <div class="section-header">
+    <div class="section-title">Today's Actions</div>
+  </div>
+  <div id="brActions" style="margin-bottom:14px;"></div>
+
+  <!-- TOP SOURCES -->
+  <div class="section-header">
+    <div class="section-title">Top Sources</div>
+  </div>
+  <div class="source-list" id="brSources"></div>
+
+  <!-- NEW COUNTRIES -->
+  <div id="brNewCountriesSection" style="display:none;">
+    <div class="section-header">
+      <div class="section-title">New Countries This Week</div>
+    </div>
+    <div class="source-list" id="brNewCountries"></div>
+  </div>
+
+  <div id="brLoadingState" class="empty">
+    <div class="emoji">📊</div>
+    <div class="title">Loading briefing...</div>
+    <div class="desc">Fetching from GitHub</div>
+  </div>
+
+</div>
+
 <!-- ============ PAGE: INSIGHTS (Traffic + Search) ============ -->
 <div class="page" id="page-insights">
 
@@ -985,9 +1095,9 @@ body {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
     Įvesti
   </button>
-  <button class="nav-btn" data-page="insights" onclick="showPage('insights')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 4 4 5-5"/></svg>
-    Insights
+  <button class="nav-btn" data-page="briefing" onclick="showPage('briefing')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+    Briefing
   </button>
   <button class="nav-btn" data-page="history" onclick="showPage('history')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
@@ -1014,6 +1124,9 @@ body {
     </div>
   </div>
 </div>
+
+<!-- Chart.js for briefing charts -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
 <script>
 // ============ DATA LAYER ============
@@ -1567,6 +1680,7 @@ function showPage(page) {
     overview: 'Apžvalga',
     retouchlab: 'RetouchLab',
     entry: 'Įvesti',
+    briefing: 'Briefing',
     insights: 'Insights',
     history: 'Istorija',
     settings: 'Nustatymai'
@@ -1604,9 +1718,279 @@ function refreshAll() {
   if (currentPage === 'overview') refreshOverview();
   if (currentPage === 'retouchlab') refreshRetouchLab();
   if (currentPage === 'entry') refreshEntry();
+  if (currentPage === 'briefing') refreshBriefing();
   if (currentPage === 'insights') refreshInsights2();
   if (currentPage === 'history') refreshHistory();
   if (currentPage === 'settings') refreshSettings();
+}
+
+// ============ BRIEFING PAGE (Morning + Evening rich briefing) ============
+let currentBriefingKind = 'morning'; // 'morning' or 'evening'
+let brChartInstance = null;
+
+function setBriefingKind(kind) {
+  currentBriefingKind = kind;
+  // Toggle button states
+  const mBtn = document.getElementById('brToggleMorning');
+  const eBtn = document.getElementById('brToggleEvening');
+  if (kind === 'morning') {
+    mBtn.style.background = 'var(--accent)';
+    mBtn.style.color = 'var(--bg)';
+    eBtn.style.background = 'transparent';
+    eBtn.style.color = 'var(--text2)';
+  } else {
+    eBtn.style.background = 'var(--accent)';
+    eBtn.style.color = 'var(--bg)';
+    mBtn.style.background = 'transparent';
+    mBtn.style.color = 'var(--text2)';
+  }
+  renderBriefing();
+}
+
+function refreshBriefing() {
+  if (!analyticsData) {
+    loadAnalyticsFromGitHub().then(() => {
+      if (analyticsData) renderBriefing();
+    });
+  } else {
+    renderBriefing();
+  }
+}
+
+function refreshBriefingData() {
+  analyticsData = null;
+  document.getElementById('brLoadingState').style.display = 'block';
+  loadAnalyticsFromGitHub().then(() => {
+    if (analyticsData) {
+      document.getElementById('brLoadingState').style.display = 'none';
+      renderBriefing();
+    }
+  });
+}
+
+function renderBriefing() {
+  if (!analyticsData) return;
+  document.getElementById('brLoadingState').style.display = 'none';
+
+  const briefings = analyticsData.briefings || {};
+  const b = briefings[currentBriefingKind];
+
+  if (!b) {
+    document.getElementById('brHeadline').textContent = 'No briefing data yet';
+    document.getElementById('brSubtitle').textContent = 'Run analytics_sync.py to generate';
+    return;
+  }
+
+  // Header
+  document.getElementById('brTitle').textContent = b.title || (currentBriefingKind === 'morning' ? '☀️ Morning Briefing' : '🌙 Evening Briefing');
+  document.getElementById('brHeadline').textContent = b.headline || '—';
+  document.getElementById('brSubtitle').textContent = b.subtitle || '';
+
+  // Key metrics
+  const km = b.keyMetrics || {};
+  document.getElementById('brUsersLabel').textContent = currentBriefingKind === 'morning' ? 'Visitors yesterday' : 'Visitors today';
+  document.getElementById('brUsers').textContent = km.users || 0;
+  document.getElementById('brSessions').textContent = km.sessions || 0;
+  document.getElementById('brPageviews').textContent = km.pageviews || 0;
+  document.getElementById('brBuyTotal').textContent = km.buyClicks || 0;
+  document.getElementById('brBuyLifetime').textContent = km.buyLifetime || 0;
+  document.getElementById('brBuySub').textContent = km.buySubscription || 0;
+  document.getElementById('brConv').textContent = (km.conversionRate || 0).toFixed(1);
+
+  // Conversion note
+  const conv = km.conversionRate || 0;
+  let convNote = '';
+  if (conv >= 25) convNote = '🔥 Excellent';
+  else if (conv >= 10) convNote = '✅ Good';
+  else if (conv >= 3) convNote = '📊 Average';
+  else if (km.users > 0) convNote = '⚠️ Low';
+  else convNote = '—';
+  document.getElementById('brConvNote').textContent = convNote;
+
+  // Week table
+  const weekDays = b.weekDays || [];
+  const weekTotal = b.weekTotal || {};
+  const tbody = document.getElementById('brWeekTableBody');
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const targetDateStr = b.keyMetrics && b.generatedAt ? b.generatedAt : todayStr;
+
+  tbody.innerHTML = weekDays.map(d => {
+    const isToday = d.date === todayStr;
+    const highlight = isToday ? 'background:rgba(245,198,208,0.08);' : '';
+    const fontWeight = isToday ? '700' : '500';
+    return `<tr style="border-top:1px solid var(--border); ${highlight}">
+      <td style="padding:10px 12px; font-weight:${fontWeight}; color:var(--text);">${d.dayName}<div style="font-size:9px; color:var(--text3); font-weight:500;">${d.date.slice(5)}</div></td>
+      <td style="padding:10px 12px; text-align:right; font-variant-numeric:tabular-nums; color:var(--text);">${d.users}</td>
+      <td style="padding:10px 12px; text-align:right; font-variant-numeric:tabular-nums; color:var(--text2);">${d.pageviews}</td>
+      <td style="padding:10px 12px; text-align:right; font-variant-numeric:tabular-nums; font-weight:700; color:var(--accent);">${d.buyTotal}</td>
+      <td style="padding:10px 12px; text-align:right; font-variant-numeric:tabular-nums; color:${d.convRate >= 10 ? '#4ade80' : d.convRate >= 3 ? 'var(--text2)' : '#f5a0b0'};">${d.convRate}%</td>
+    </tr>`;
+  }).join('');
+
+  // Footer
+  const tfoot = document.getElementById('brWeekTableFoot');
+  tfoot.innerHTML = `<tr style="border-top:2px solid var(--accent); background:var(--surface2);">
+    <td style="padding:12px; font-weight:800; color:var(--text); text-transform:uppercase; font-size:10px; letter-spacing:0.5px;">Total</td>
+    <td style="padding:12px; text-align:right; font-weight:800; color:var(--text); font-variant-numeric:tabular-nums;">${weekTotal.users || 0}</td>
+    <td style="padding:12px; text-align:right; font-weight:800; color:var(--text); font-variant-numeric:tabular-nums;">${weekTotal.pageviews || 0}</td>
+    <td style="padding:12px; text-align:right; font-weight:800; color:var(--accent); font-variant-numeric:tabular-nums;">${weekTotal.buyTotal || 0}</td>
+    <td style="padding:12px; text-align:right; font-weight:800; color:var(--text2); font-variant-numeric:tabular-nums;">${(weekTotal.convRate || 0).toFixed(1)}%</td>
+  </tr>`;
+
+  // Week comparison
+  const wc = b.weekComparison || {};
+  const wcBox = document.getElementById('brWeekCompareBox');
+  const wcText = document.getElementById('brWeekCompareText');
+  if (wc.lastWeek && wc.lastWeek.users > 0 && wc.usersDelta !== null && wc.usersDelta !== undefined) {
+    const arrow = wc.usersDelta >= 0 ? '↑' : '↓';
+    const color = wc.usersDelta >= 0 ? '#4ade80' : '#f5a0b0';
+    wcText.innerHTML = `<strong>This week:</strong> ${wc.thisWeek.users} users, ${wc.thisWeek.buyClicks} BUY clicks<br><strong>Last week:</strong> ${wc.lastWeek.users} users, ${wc.lastWeek.buyClicks} BUY clicks<br><span style="color:${color}; font-weight:700;">${arrow} ${Math.abs(wc.usersDelta)}%</span> users vs last week`;
+  } else {
+    wcText.innerHTML = `<strong>This week:</strong> ${wc.thisWeek?.users || 0} users, ${wc.thisWeek?.buyClicks || 0} BUY clicks<br><span style="color:var(--text3);">Not enough data to compare to last week yet</span>`;
+  }
+
+  // Insights
+  const insights = b.insights || [];
+  document.getElementById('brInsights').innerHTML = insights.map(i => {
+    let bg, borderColor;
+    if (i.type === 'positive') { bg = 'rgba(74,222,128,0.08)'; borderColor = '#4ade80'; }
+    else if (i.type === 'warning') { bg = 'rgba(245,160,176,0.08)'; borderColor = '#f5a0b0'; }
+    else { bg = 'var(--surface)'; borderColor = 'var(--border)'; }
+    return `<div style="background:${bg}; border:1px solid ${borderColor}; border-radius:14px; padding:14px 16px; margin-bottom:10px; display:flex; gap:12px; align-items:flex-start;">
+      <div style="font-size:22px; flex-shrink:0;">${i.icon}</div>
+      <div>
+        <div style="font-size:13px; font-weight:800; color:var(--text); margin-bottom:3px;">${i.title}</div>
+        <div style="font-size:12px; color:var(--text2); line-height:1.5;">${i.text}</div>
+      </div>
+    </div>`;
+  }).join('') || '<div class="empty" style="padding:20px;"><div class="desc">No insights yet</div></div>';
+
+  // Actions
+  const actions = b.actions || [];
+  document.getElementById('brActions').innerHTML = actions.map(a => {
+    const priorityLabel = a.priority === 'high' ? '🔴 HIGH' : a.priority === 'medium' ? '🟡 MED' : '🟢 LOW';
+    const priorityColor = a.priority === 'high' ? '#f5a0b0' : a.priority === 'medium' ? '#fbbf24' : '#4ade80';
+    return `<div style="background:var(--surface); border:1px solid var(--border); border-left:3px solid ${priorityColor}; border-radius:12px; padding:12px 14px; margin-bottom:8px;">
+      <div style="font-size:9px; font-weight:800; color:${priorityColor}; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">${priorityLabel}</div>
+      <div style="font-size:13px; color:var(--text); line-height:1.5;">${a.text}</div>
+    </div>`;
+  }).join('') || '<div class="empty" style="padding:16px;"><div class="desc">No actions</div></div>';
+
+  // Top sources
+  const sources = b.topSources || [];
+  document.getElementById('brSources').innerHTML = sources.slice(0, 6).map(s => {
+    let icon = '🔗';
+    const src = s.source.toLowerCase();
+    if (src.includes('instagram') || src === 'ig') icon = '📷';
+    else if (src.includes('facebook')) icon = '👥';
+    else if (src.includes('google')) icon = '🔍';
+    else if (src.includes('klaviyo') || s.medium === 'email') icon = '📧';
+    else if (src === '(direct)') icon = '🌐';
+    else if (src.includes('chatgpt') || src.includes('perplexity') || src.includes('claude')) icon = '🤖';
+    return `<div class="source-row">
+      <div class="source-icon">${icon}</div>
+      <div class="source-info">
+        <div class="source-name">${s.source}</div>
+        <div class="source-meta">${s.medium} · ${s.users} users</div>
+      </div>
+      <div class="source-amount">${s.sessions}</div>
+    </div>`;
+  }).join('') || '<div class="empty" style="padding:16px;"><div class="desc">No data</div></div>';
+
+  // New countries
+  const newCountries = b.newCountries || [];
+  const ncSection = document.getElementById('brNewCountriesSection');
+  if (newCountries.length > 0) {
+    ncSection.style.display = 'block';
+    const flagMap = { 'Lithuania':'🇱🇹','United States':'🇺🇸','Germany':'🇩🇪','United Kingdom':'🇬🇧','Netherlands':'🇳🇱','Denmark':'🇩🇰','Singapore':'🇸🇬','Canada':'🇨🇦','Italy':'🇮🇹','France':'🇫🇷','Spain':'🇪🇸','Poland':'🇵🇱','Sweden':'🇸🇪','Australia':'🇦🇺','India':'🇮🇳','Ireland':'🇮🇪','Belgium':'🇧🇪','Russia':'🇷🇺','Ghana':'🇬🇭','Thailand':'🇹🇭','South Korea':'🇰🇷','Norway':'🇳🇴','Colombia':'🇨🇴','Egypt':'🇪🇬','Estonia':'🇪🇪','Malawi':'🇲🇼' };
+    document.getElementById('brNewCountries').innerHTML = newCountries.map(c => `<div class="source-row">
+      <div class="source-icon">${flagMap[c] || '🌍'}</div>
+      <div class="source-info">
+        <div class="source-name">${c}</div>
+        <div class="source-meta">First time this week</div>
+      </div>
+    </div>`).join('');
+  } else {
+    ncSection.style.display = 'none';
+  }
+
+  // Chart
+  renderBriefingChart(b.chartData || {});
+}
+
+function renderBriefingChart(chartData) {
+  const canvas = document.getElementById('brChart');
+  if (!canvas) return;
+
+  // Destroy old chart
+  if (brChartInstance) {
+    brChartInstance.destroy();
+    brChartInstance = null;
+  }
+
+  if (!window.Chart) {
+    // Chart.js not loaded yet — retry
+    setTimeout(() => renderBriefingChart(chartData), 500);
+    return;
+  }
+
+  const ctx = canvas.getContext('2d');
+  brChartInstance = new Chart(ctx, {
+    data: {
+      labels: chartData.labels || [],
+      datasets: [
+        {
+          type: 'bar',
+          label: 'Visitors',
+          data: chartData.users || [],
+          backgroundColor: '#f5c6d0',
+          borderRadius: 6,
+          yAxisID: 'y',
+          order: 2,
+        },
+        {
+          type: 'line',
+          label: 'BUY clicks',
+          data: chartData.buyClicks || [],
+          borderColor: '#4ade80',
+          backgroundColor: 'rgba(74,222,128,0.1)',
+          borderWidth: 3,
+          pointBackgroundColor: '#4ade80',
+          pointRadius: 5,
+          tension: 0.35,
+          yAxisID: 'y1',
+          order: 1,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { labels: { color: '#c4949e', font: { size: 11, weight: '600' } } },
+        tooltip: {
+          backgroundColor: '#1a0a0e', titleColor: '#fff', bodyColor: '#fff5f5',
+          borderColor: '#f5c6d0', borderWidth: 1, padding: 10,
+        },
+      },
+      scales: {
+        x: { ticks: { color: '#7a4a55', font: { size: 10 } }, grid: { color: '#2e1a20' } },
+        y: {
+          type: 'linear', position: 'left', beginAtZero: true,
+          title: { display: true, text: 'Visitors', color: '#f5c6d0', font: { size: 10, weight: '700' } },
+          ticks: { color: '#f5c6d0', font: { size: 10 } },
+          grid: { color: '#2e1a20' },
+        },
+        y1: {
+          type: 'linear', position: 'right', beginAtZero: true,
+          title: { display: true, text: 'BUY', color: '#4ade80', font: { size: 10, weight: '700' } },
+          ticks: { color: '#4ade80', font: { size: 10 } },
+          grid: { drawOnChartArea: false },
+        },
+      },
+    },
+  });
 }
 
 // ============ INSIGHTS PAGE (GA4 + Search Console) ============
