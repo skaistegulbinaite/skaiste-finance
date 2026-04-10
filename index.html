@@ -615,6 +615,43 @@ body {
     </div>
   </div>
 
+  <!-- DAILY REVENUE TRACKER -->
+  <div class="section-header">
+    <div class="section-title">Daily Revenue</div>
+    <button class="section-action" onclick="toggleDailyEntry()">+ Add</button>
+  </div>
+
+  <div id="rlDailyEntry" style="display:none; background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:16px; margin-bottom:14px;">
+    <div style="display:flex; gap:10px; align-items:center; margin-bottom:10px;">
+      <input type="date" id="rlDailyDate" style="flex:1; background:var(--surface2); border:1px solid var(--border); color:var(--text); font-family:'Manrope',sans-serif; font-size:14px; padding:10px 12px; border-radius:10px;">
+      <input type="number" step="0.01" id="rlDailyAmount" placeholder="€ amount" style="width:100px; background:var(--surface2); border:1px solid var(--border); color:var(--text); font-family:'Archivo Black',sans-serif; font-size:15px; padding:10px 12px; border-radius:10px; text-align:right;">
+    </div>
+    <div style="display:flex; gap:8px; margin-bottom:10px;">
+      <button onclick="setDailyType('lifetime')" id="rlTypeLifetime" style="flex:1; padding:8px; border-radius:8px; border:1px solid var(--accent); background:var(--accent); color:var(--bg); font-size:11px; font-weight:700; cursor:pointer;">LIFETIME €79</button>
+      <button onclick="setDailyType('subscription')" id="rlTypeSub" style="flex:1; padding:8px; border-radius:8px; border:1px solid var(--border); background:transparent; color:var(--text2); font-size:11px; font-weight:700; cursor:pointer;">SUB €7.99</button>
+      <button onclick="setDailyType('total')" id="rlTypeTotal" style="flex:1; padding:8px; border-radius:8px; border:1px solid var(--border); background:transparent; color:var(--text2); font-size:11px; font-weight:700; cursor:pointer;">TOTAL</button>
+    </div>
+    <input type="text" id="rlDailyNote" placeholder="Note (optional)" style="width:100%; background:var(--surface2); border:1px solid var(--border); color:var(--text); font-family:'Manrope',sans-serif; font-size:12px; padding:8px 12px; border-radius:8px; margin-bottom:10px;">
+    <button onclick="saveDailyRevenue()" style="width:100%; padding:12px; background:var(--accent); color:var(--bg); border:none; border-radius:10px; font-weight:800; font-size:13px; cursor:pointer; letter-spacing:0.5px;">SAVE</button>
+  </div>
+
+  <!-- Daily revenue list -->
+  <div id="rlDailyList" style="margin-bottom:14px;"></div>
+
+  <!-- Monthly revenue summary from daily entries -->
+  <div class="metric-grid" id="rlDailySummary" style="margin-bottom:14px;">
+    <div class="metric-card profit">
+      <div class="label">This month (daily entries)</div>
+      <div class="value">€<span id="rlDailyMonthTotal">0</span></div>
+      <div class="sub" id="rlDailyCount">0 entries</div>
+    </div>
+    <div class="metric-card retouchlab">
+      <div class="label">Daily average</div>
+      <div class="value">€<span id="rlDailyAvg">0</span></div>
+      <div class="sub" id="rlDailyProjection">—</div>
+    </div>
+  </div>
+
   <div class="section-header">
     <div class="section-title">Iš kur atėjo pinigai</div>
     <button class="section-action" onclick="showPage('entry')">Įvesti</button>
@@ -1233,8 +1270,9 @@ function loadData() {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       const parsed = JSON.parse(stored);
-      // Ensure months object exists
+      // Ensure months + rlDaily objects exist
       if (!parsed.months) parsed.months = {};
+      if (!parsed.rlDaily) parsed.rlDaily = [];
       const merged = {...DEFAULT_DATA, ...parsed};
       // MIGRATION: clean up old Beribu defaults (€125/€50 per week)
       // These were auto-seeded by old emptyWeek(). Now Beribu is monthly.
@@ -2631,6 +2669,122 @@ function refreshInsights() {
   document.getElementById('ovInsights').innerHTML = html;
 }
 
+// ============ DAILY REVENUE TRACKER ============
+let dailyEntryType = 'lifetime';
+
+function toggleDailyEntry() {
+  const el = document.getElementById('rlDailyEntry');
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+  if (el.style.display === 'block') {
+    document.getElementById('rlDailyDate').value = new Date().toISOString().slice(0, 10);
+    document.getElementById('rlDailyAmount').value = '';
+    document.getElementById('rlDailyNote').value = '';
+    document.getElementById('rlDailyAmount').focus();
+  }
+}
+
+function setDailyType(type) {
+  dailyEntryType = type;
+  ['rlTypeLifetime', 'rlTypeSub', 'rlTypeTotal'].forEach(id => {
+    const btn = document.getElementById(id);
+    if ((type === 'lifetime' && id === 'rlTypeLifetime') ||
+        (type === 'subscription' && id === 'rlTypeSub') ||
+        (type === 'total' && id === 'rlTypeTotal')) {
+      btn.style.background = 'var(--accent)';
+      btn.style.color = 'var(--bg)';
+      btn.style.borderColor = 'var(--accent)';
+    } else {
+      btn.style.background = 'transparent';
+      btn.style.color = 'var(--text2)';
+      btn.style.borderColor = 'var(--border)';
+    }
+  });
+}
+
+function saveDailyRevenue() {
+  const dateVal = document.getElementById('rlDailyDate').value;
+  const amount = parseFloat(document.getElementById('rlDailyAmount').value) || 0;
+  const note = document.getElementById('rlDailyNote').value.trim();
+
+  if (!dateVal || amount <= 0) return;
+
+  if (!data.rlDaily) data.rlDaily = [];
+  data.rlDaily.push({
+    date: dateVal,
+    amount: amount,
+    type: dailyEntryType,
+    note: note,
+    ts: Date.now()
+  });
+
+  saveData();
+  document.getElementById('rlDailyEntry').style.display = 'none';
+  showSaveToast();
+  renderDailyRevenue();
+}
+
+function deleteDailyEntry(index) {
+  if (!data.rlDaily) return;
+  data.rlDaily.splice(index, 1);
+  saveData();
+  renderDailyRevenue();
+}
+
+function renderDailyRevenue() {
+  if (!data.rlDaily) data.rlDaily = [];
+
+  // Sort by date descending
+  const sorted = [...data.rlDaily].sort((a, b) => b.date.localeCompare(a.date));
+
+  // Current month filter
+  const now = new Date();
+  const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const monthEntries = sorted.filter(e => e.date.startsWith(currentMonthKey));
+
+  // Render list (show last 14 entries)
+  const listEl = document.getElementById('rlDailyList');
+  if (sorted.length === 0) {
+    listEl.innerHTML = `<div style="background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:20px; text-align:center; color:var(--text3); font-size:12px;">
+      No daily revenue entries yet. Press "+ Add" to log your first sale.
+    </div>`;
+  } else {
+    const typeIcons = { lifetime: '💎', subscription: '🔄', total: '💰' };
+    const typeLabels = { lifetime: 'Lifetime', subscription: 'Sub', total: 'Total' };
+    listEl.innerHTML = `<div style="background:var(--surface); border:1px solid var(--border); border-radius:14px; overflow:hidden;">` +
+      sorted.slice(0, 14).map((e, idx) => {
+        const origIdx = data.rlDaily.indexOf(e);
+        const dayName = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date(e.date + 'T12:00:00').getDay()];
+        return `<div style="display:flex; align-items:center; gap:12px; padding:12px 14px; border-bottom:1px solid var(--border);">
+          <div style="font-size:18px; flex-shrink:0;">${typeIcons[e.type] || '💰'}</div>
+          <div style="flex:1; min-width:0;">
+            <div style="font-size:13px; font-weight:700; color:var(--text);">${dayName} ${e.date.slice(5)}</div>
+            <div style="font-size:10px; color:var(--text3);">${typeLabels[e.type] || e.type}${e.note ? ' · ' + e.note : ''}</div>
+          </div>
+          <div style="font-family:'Archivo Black',sans-serif; font-size:16px; color:var(--accent);">€${e.amount.toFixed(2)}</div>
+          <button onclick="deleteDailyEntry(${origIdx})" style="background:none; border:none; color:var(--text3); cursor:pointer; font-size:16px; padding:4px;">×</button>
+        </div>`;
+      }).join('') +
+      `</div>`;
+  }
+
+  // Monthly summary
+  const monthTotal = monthEntries.reduce((s, e) => s + e.amount, 0);
+  const monthCount = monthEntries.length;
+
+  // Days with entries this month
+  const uniqueDays = new Set(monthEntries.map(e => e.date)).size;
+  const dailyAvg = uniqueDays > 0 ? monthTotal / uniqueDays : 0;
+
+  // Projection (daily avg × 30)
+  const projection = dailyAvg * 30;
+
+  document.getElementById('rlDailyMonthTotal').textContent = fmt(monthTotal);
+  document.getElementById('rlDailyCount').textContent = `${monthCount} entries, ${uniqueDays} days`;
+  document.getElementById('rlDailyAvg').textContent = fmt(dailyAvg);
+  document.getElementById('rlDailyProjection').textContent =
+    uniqueDays >= 3 ? `→ €${fmt(projection)}/month projected` : 'Need 3+ days for projection';
+}
+
 function refreshRetouchLab() {
   let dataset, total, count;
   let isMonth = currentPeriod === 'month';
@@ -2751,6 +2905,9 @@ function refreshRetouchLab() {
     </div>
   `).join('');
   document.getElementById('rlInsights').innerHTML = rlInsightsHTML;
+
+  // Daily revenue tracker
+  renderDailyRevenue();
 }
 
 const ENTRY_FIELDS = [
