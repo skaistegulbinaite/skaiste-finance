@@ -976,6 +976,50 @@ body {
   <div class="source-list" id="brSources"></div>
 
   <!-- NEW COUNTRIES -->
+  <!-- SEO SECTION -->
+  <div class="section-header">
+    <div class="section-title">SEO & Google Search</div>
+  </div>
+
+  <!-- SEO metrics -->
+  <div class="metric-grid" id="brSeoMetrics">
+    <div class="metric-card income">
+      <div class="label">Google clicks</div>
+      <div class="value" id="brSeoClicks">—</div>
+      <div class="sub" id="brSeoClicksDelta">—</div>
+    </div>
+    <div class="metric-card income">
+      <div class="label">Impressions</div>
+      <div class="value" id="brSeoImpressions">—</div>
+      <div class="sub" id="brSeoImpDelta">—</div>
+    </div>
+    <div class="metric-card retouchlab">
+      <div class="label">CTR</div>
+      <div class="value"><span id="brSeoCTR">—</span>%</div>
+      <div class="sub" id="brSeoCTRNote">—</div>
+    </div>
+    <div class="metric-card retouchlab">
+      <div class="label">Avg position</div>
+      <div class="value" id="brSeoPosition">—</div>
+      <div class="sub" id="brSeoPosNote">—</div>
+    </div>
+  </div>
+
+  <!-- SEO insights -->
+  <div id="brSeoInsights" style="margin-bottom:14px;"></div>
+
+  <!-- Top queries -->
+  <div class="section-header">
+    <div class="section-title">What People Search (Top Queries)</div>
+  </div>
+  <div class="source-list" id="brSeoQueries"></div>
+
+  <!-- Top SEO pages -->
+  <div class="section-header">
+    <div class="section-title">SEO Page Performance</div>
+  </div>
+  <div class="source-list" id="brSeoPages"></div>
+
   <div id="brNewCountriesSection" style="display:none;">
     <div class="section-header">
       <div class="section-title">New Countries This Week</div>
@@ -1914,8 +1958,103 @@ function renderBriefing() {
     ncSection.style.display = 'none';
   }
 
+  // SEO section
+  renderBriefingSeo(b.seo || {});
+
   // Chart
   renderBriefingChart(b.chartData || {});
+}
+
+function renderBriefingSeo(seo) {
+  const m = seo.metrics || {};
+  const tw = m.thisWeek || {};
+  const lw = m.lastWeek || {};
+
+  // Metrics
+  document.getElementById('brSeoClicks').textContent = tw.clicks || 0;
+  document.getElementById('brSeoImpressions').textContent = tw.impressions || 0;
+  document.getElementById('brSeoCTR').textContent = (tw.ctr || 0).toFixed(1);
+  document.getElementById('brSeoPosition').textContent = (tw.position || 0).toFixed(1);
+
+  // Deltas
+  if (lw.clicks !== undefined && lw.clicks > 0) {
+    const clicksDelta = (tw.clicks || 0) - lw.clicks;
+    const clicksPct = Math.round(clicksDelta / lw.clicks * 100);
+    const arrow = clicksDelta >= 0 ? '↑' : '↓';
+    const color = clicksDelta >= 0 ? '#4ade80' : '#f5a0b0';
+    document.getElementById('brSeoClicksDelta').innerHTML = `<span style="color:${color}">${arrow} ${Math.abs(clicksPct)}% vs last week</span>`;
+  } else {
+    document.getElementById('brSeoClicksDelta').textContent = 'vs last week: —';
+  }
+
+  if (lw.impressions !== undefined && lw.impressions > 0) {
+    const impDelta = (tw.impressions || 0) - lw.impressions;
+    const impPct = Math.round(impDelta / lw.impressions * 100);
+    const arrow = impDelta >= 0 ? '↑' : '↓';
+    const color = impDelta >= 0 ? '#4ade80' : '#f5a0b0';
+    document.getElementById('brSeoImpDelta').innerHTML = `<span style="color:${color}">${arrow} ${Math.abs(impPct)}% vs last week</span>`;
+  } else {
+    document.getElementById('brSeoImpDelta').textContent = 'vs last week: —';
+  }
+
+  // CTR note
+  const ctr = tw.ctr || 0;
+  if (ctr >= 8) document.getElementById('brSeoCTRNote').textContent = '🔥 Excellent';
+  else if (ctr >= 3) document.getElementById('brSeoCTRNote').textContent = '✅ Good (avg ~3.5%)';
+  else if (ctr > 0) document.getElementById('brSeoCTRNote').textContent = '⚠️ Below average';
+  else document.getElementById('brSeoCTRNote').textContent = '—';
+
+  // Position note
+  const pos = tw.position || 0;
+  if (pos > 0 && pos <= 10) document.getElementById('brSeoPosNote').textContent = '🏆 Page 1';
+  else if (pos <= 20) document.getElementById('brSeoPosNote').textContent = 'Page 2 — close';
+  else if (pos <= 40) document.getElementById('brSeoPosNote').textContent = 'Page 3-4';
+  else if (pos > 40) document.getElementById('brSeoPosNote').textContent = 'Far — patience needed';
+  else document.getElementById('brSeoPosNote').textContent = '—';
+
+  // SEO insights
+  const insights = seo.insights || [];
+  document.getElementById('brSeoInsights').innerHTML = insights.map(i => {
+    let bg, borderColor;
+    if (i.type === 'positive') { bg = 'rgba(74,222,128,0.08)'; borderColor = '#4ade80'; }
+    else if (i.type === 'warning') { bg = 'rgba(245,160,176,0.08)'; borderColor = '#f5a0b0'; }
+    else { bg = 'var(--surface)'; borderColor = 'var(--border)'; }
+    return `<div style="background:${bg}; border:1px solid ${borderColor}; border-radius:14px; padding:14px 16px; margin-bottom:10px; display:flex; gap:12px; align-items:flex-start;">
+      <div style="font-size:22px; flex-shrink:0;">${i.icon}</div>
+      <div>
+        <div style="font-size:13px; font-weight:800; color:var(--text); margin-bottom:3px;">${i.title}</div>
+        <div style="font-size:12px; color:var(--text2); line-height:1.5;">${i.text}</div>
+      </div>
+    </div>`;
+  }).join('') || '';
+
+  // Top queries
+  const queries = seo.topQueries || [];
+  document.getElementById('brSeoQueries').innerHTML = queries.slice(0, 8).map(q => {
+    const hasClicks = q.clicks > 0;
+    return `<div class="source-row">
+      <div class="source-icon">${hasClicks ? '✅' : '👁️'}</div>
+      <div class="source-info">
+        <div class="source-name">${q.query}</div>
+        <div class="source-meta">pos ${q.position} · ${q.impressions} impr</div>
+      </div>
+      <div class="source-amount ${hasClicks ? '' : 'empty'}">${q.clicks}</div>
+    </div>`;
+  }).join('') || '<div style="padding:16px; color:var(--text3); font-size:12px; text-align:center;">No search queries yet</div>';
+
+  // Top pages
+  const pages = seo.topPages || [];
+  document.getElementById('brSeoPages').innerHTML = pages.slice(0, 8).map(p => {
+    const hasClicks = p.clicks > 0;
+    return `<div class="source-row">
+      <div class="source-icon">${hasClicks ? '✅' : '⚠️'}</div>
+      <div class="source-info">
+        <div class="source-name">${p.page}</div>
+        <div class="source-meta">pos ${p.position} · ${p.impressions} impr</div>
+      </div>
+      <div class="source-amount ${hasClicks ? '' : 'empty'}">${p.clicks}</div>
+    </div>`;
+  }).join('') || '<div style="padding:16px; color:var(--text3); font-size:12px; text-align:center;">No page data yet</div>';
 }
 
 function renderBriefingChart(chartData) {
