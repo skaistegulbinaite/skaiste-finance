@@ -958,6 +958,58 @@ body {
     </div>
   </div>
 
+  <!-- GOOGLE ADS PERFORMANCE -->
+  <div id="brGoogleAdsSection" style="display:none;">
+    <div class="section-header">
+      <div class="section-title">Google Ads — Live</div>
+      <button class="section-action" onclick="refreshBriefingData()">↻ Refresh</button>
+    </div>
+
+    <div style="background:linear-gradient(135deg, rgba(66,133,244,0.12), rgba(66,133,244,0.03)); border:1px solid rgba(66,133,244,0.25); border-radius:18px; padding:16px; margin-bottom:14px;">
+      <!-- Today row -->
+      <div style="font-size:10px; font-weight:700; color:rgba(66,133,244,0.9); text-transform:uppercase; letter-spacing:1px; margin-bottom:10px;">🔍 Today from Google Ads</div>
+      <div style="display:flex; gap:10px; margin-bottom:14px;">
+        <div style="flex:1; background:var(--surface); border-radius:12px; padding:12px; text-align:center;">
+          <div style="font-size:9px; color:var(--text3); font-weight:700; text-transform:uppercase;">Visitors</div>
+          <div id="brGadsToday" style="font-family:'Archivo Black',sans-serif; font-size:24px; color:var(--text); margin-top:2px;">0</div>
+        </div>
+        <div style="flex:1; background:var(--surface); border-radius:12px; padding:12px; text-align:center;">
+          <div style="font-size:9px; color:var(--text3); font-weight:700; text-transform:uppercase;">BUY Clicks</div>
+          <div id="brGadsBuyToday" style="font-family:'Archivo Black',sans-serif; font-size:24px; color:var(--accent); margin-top:2px;">0</div>
+          <div id="brGadsBuyDetail" style="font-size:9px; color:var(--text3); margin-top:2px;">—</div>
+        </div>
+        <div style="flex:1; background:var(--surface); border-radius:12px; padding:12px; text-align:center;">
+          <div style="font-size:9px; color:var(--text3); font-weight:700; text-transform:uppercase;">Conv %</div>
+          <div id="brGadsConvToday" style="font-family:'Archivo Black',sans-serif; font-size:24px; margin-top:2px;">0%</div>
+        </div>
+      </div>
+
+      <!-- 7 day row -->
+      <div style="font-size:10px; font-weight:700; color:var(--text3); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px; padding-top:10px; border-top:1px solid var(--border);">Last 7 Days</div>
+      <div style="display:flex; gap:10px; margin-bottom:12px;">
+        <div style="flex:1; background:var(--surface); border-radius:12px; padding:10px; text-align:center;">
+          <div style="font-size:9px; color:var(--text3); font-weight:700; text-transform:uppercase;">Visitors</div>
+          <div id="brGads7d" style="font-family:'Archivo Black',sans-serif; font-size:18px; color:var(--text); margin-top:2px;">0</div>
+        </div>
+        <div style="flex:1; background:var(--surface); border-radius:12px; padding:10px; text-align:center;">
+          <div style="font-size:9px; color:var(--text3); font-weight:700; text-transform:uppercase;">BUY Clicks</div>
+          <div id="brGadsBuy7d" style="font-family:'Archivo Black',sans-serif; font-size:18px; color:var(--accent); margin-top:2px;">0</div>
+        </div>
+        <div style="flex:1; background:var(--surface); border-radius:12px; padding:10px; text-align:center;">
+          <div style="font-size:9px; color:var(--text3); font-weight:700; text-transform:uppercase;">Conv %</div>
+          <div id="brGadsConv7d" style="font-family:'Archivo Black',sans-serif; font-size:18px; margin-top:2px;">0%</div>
+        </div>
+      </div>
+
+      <!-- Mini daily chart -->
+      <div style="display:flex; align-items:flex-end; gap:4px; height:60px; padding-top:6px;" id="brGadsDailyChart"></div>
+      <div style="display:flex; gap:4px; margin-top:4px;" id="brGadsDailyLabels"></div>
+
+      <!-- Revenue estimate -->
+      <div id="brGadsRevenue" style="margin-top:12px; padding-top:10px; border-top:1px solid var(--border); font-size:12px; color:var(--text2); text-align:center;">—</div>
+    </div>
+  </div>
+
   <!-- WEEK COMPARISON CHART -->
   <div class="section-header">
     <div class="section-title">Last 7 Days</div>
@@ -2067,11 +2119,78 @@ function renderBriefing() {
     ncSection.style.display = 'none';
   }
 
+  // Google Ads section
+  renderGoogleAds(b.googleAds || {});
+
   // SEO section
   renderBriefingSeo(b.seo || {});
 
   // Chart
   renderBriefingChart(b.chartData || {});
+}
+
+function renderGoogleAds(gads) {
+  const section = document.getElementById('brGoogleAdsSection');
+  const today = gads.today || {};
+  const week = gads.last7Days || {};
+  const daily = gads.daily || [];
+
+  // Show section if there's any data or if campaign exists (always show after setup)
+  const hasData = (today.users || 0) > 0 || (week.users || 0) > 0 || daily.length > 0;
+  section.style.display = 'block'; // Always show after Google Ads is set up
+
+  // Today
+  document.getElementById('brGadsToday').textContent = today.users || 0;
+  const buyToday = today.buyClicks || {};
+  document.getElementById('brGadsBuyToday').textContent = buyToday.total || 0;
+  document.getElementById('brGadsBuyDetail').textContent =
+    (buyToday.total || 0) > 0 ? `€79: ${buyToday.lifetime || 0} · sub: ${buyToday.subscription || 0}` : 'no buys yet';
+
+  const convToday = today.convRate || 0;
+  const convTodayEl = document.getElementById('brGadsConvToday');
+  convTodayEl.textContent = convToday.toFixed(1) + '%';
+  convTodayEl.style.color = convToday >= 10 ? '#4ade80' : convToday > 0 ? 'var(--accent)' : 'var(--text3)';
+
+  // Last 7 days
+  document.getElementById('brGads7d').textContent = week.users || 0;
+  const buyWeek = week.buyClicks || {};
+  document.getElementById('brGadsBuy7d').textContent = buyWeek.total || 0;
+  const convWeek = week.convRate || 0;
+  const convWeekEl = document.getElementById('brGadsConv7d');
+  convWeekEl.textContent = convWeek.toFixed(1) + '%';
+  convWeekEl.style.color = convWeek >= 10 ? '#4ade80' : convWeek > 0 ? 'var(--accent)' : 'var(--text3)';
+
+  // Mini daily chart
+  const chartEl = document.getElementById('brGadsDailyChart');
+  const labelsEl = document.getElementById('brGadsDailyLabels');
+  if (daily.length > 0) {
+    const maxUsers = Math.max(1, ...daily.map(d => d.users));
+    chartEl.innerHTML = daily.map(d => {
+      const h = Math.max(2, (d.users / maxUsers) * 50);
+      const hasBuy = d.buyClicks > 0;
+      const bg = hasBuy ? 'linear-gradient(180deg, #4ade80, #22c55e)' : 'linear-gradient(180deg, rgba(66,133,244,0.6), rgba(66,133,244,0.3))';
+      return `<div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px;">
+        <div style="font-size:8px; color:${hasBuy ? '#4ade80' : 'var(--text3)'}; font-weight:700;">${d.users > 0 ? d.users : ''}</div>
+        <div style="width:100%; height:${h}px; background:${bg}; border-radius:4px 4px 0 0;"></div>
+        ${hasBuy ? `<div style="font-size:8px; color:#4ade80; font-weight:800;">🛒${d.buyClicks}</div>` : ''}
+      </div>`;
+    }).join('');
+    labelsEl.innerHTML = daily.map(d =>
+      `<div style="flex:1; text-align:center; font-size:8px; color:var(--text3); font-weight:600;">${d.dayName}</div>`
+    ).join('');
+  }
+
+  // Revenue estimate
+  const totalBuys7d = buyWeek.total || 0;
+  const revEl = document.getElementById('brGadsRevenue');
+  if (totalBuys7d > 0) {
+    const estRevenue = (buyWeek.lifetime || 0) * 79 + (buyWeek.subscription || 0) * 7.99;
+    revEl.innerHTML = `<span style="color:var(--green); font-weight:800;">Est. revenue: €${estRevenue.toFixed(0)}</span> from Google Ads (7d)`;
+  } else if ((week.users || 0) > 0) {
+    revEl.innerHTML = `<span style="color:var(--text3);">${week.users} visitors from ads, no buys yet — give it time</span>`;
+  } else {
+    revEl.innerHTML = `<span style="color:var(--text3);">Campaign just started — data will appear here</span>`;
+  }
 }
 
 function renderBriefingSeo(seo) {
