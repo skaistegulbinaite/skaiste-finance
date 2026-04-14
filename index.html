@@ -960,7 +960,7 @@ body {
 
   <!-- WEEK COMPARISON CHART -->
   <div class="section-header">
-    <div class="section-title">Week Overview</div>
+    <div class="section-title">Last 7 Days</div>
     <button class="section-action" onclick="refreshBriefingData()">↻ Refresh</button>
   </div>
 
@@ -970,7 +970,7 @@ body {
 
   <!-- WEEK TABLE -->
   <div class="section-header">
-    <div class="section-title">This Week — Day by Day</div>
+    <div class="section-title">Last 7 Days — Day by Day</div>
   </div>
   <div style="background:var(--surface); border:1px solid var(--border); border-radius:14px; overflow:hidden; margin-bottom:14px;">
     <table id="brWeekTable" style="width:100%; border-collapse:collapse; font-size:12px;">
@@ -990,7 +990,7 @@ body {
 
   <!-- WEEK VS LAST WEEK -->
   <div id="brWeekCompareBox" style="background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:14px 16px; margin-bottom:14px; font-size:12px;">
-    <div style="font-size:10px; color:var(--text3); text-transform:uppercase; letter-spacing:0.5px; font-weight:700; margin-bottom:6px;">vs Last Week</div>
+    <div style="font-size:10px; color:var(--text3); text-transform:uppercase; letter-spacing:0.5px; font-weight:700; margin-bottom:6px;">vs Previous 7 Days</div>
     <div id="brWeekCompareText" style="color:var(--text); line-height:1.5;">—</div>
   </div>
 
@@ -1011,6 +1011,26 @@ body {
     <div class="section-title">Top Sources</div>
   </div>
   <div class="source-list" id="brSources"></div>
+
+  <!-- TRAFFIC & CONVERSIONS BY SOURCE -->
+  <div class="section-header">
+    <div class="section-title">Traffic & Conversions by Source</div>
+  </div>
+  <div style="background:var(--surface); border:1px solid var(--border); border-radius:14px; overflow:hidden; margin-bottom:14px;">
+    <table id="brSourceBuyTable" style="width:100%; border-collapse:collapse; font-size:12px;">
+      <thead>
+        <tr style="background:var(--surface2);">
+          <th style="text-align:left; padding:10px 12px; font-size:10px; color:var(--text3); text-transform:uppercase; letter-spacing:0.5px; font-weight:700;">Source</th>
+          <th style="text-align:right; padding:10px 8px; font-size:10px; color:var(--text3); text-transform:uppercase; letter-spacing:0.5px; font-weight:700;">Users</th>
+          <th style="text-align:right; padding:10px 8px; font-size:10px; color:var(--text3); text-transform:uppercase; letter-spacing:0.5px; font-weight:700;">BUY 79</th>
+          <th style="text-align:right; padding:10px 8px; font-size:10px; color:var(--text3); text-transform:uppercase; letter-spacing:0.5px; font-weight:700;">BUY sub</th>
+          <th style="text-align:right; padding:10px 8px; font-size:10px; color:var(--text3); text-transform:uppercase; letter-spacing:0.5px; font-weight:700;">Total</th>
+          <th style="text-align:right; padding:10px 12px; font-size:10px; color:var(--text3); text-transform:uppercase; letter-spacing:0.5px; font-weight:700;">Conv%</th>
+        </tr>
+      </thead>
+      <tbody id="brSourceBuyTableBody"></tbody>
+    </table>
+  </div>
 
   <!-- NEW COUNTRIES -->
   <!-- SEO SECTION -->
@@ -1619,6 +1639,37 @@ function calcWeekIncome(week) {
          (week.beribu_card||0) + (week.beribu_cash||0);
 }
 
+// rlDaily helpers — sum daily revenue entries for a given week or month
+function getRLDailyForWeek(weekKey) {
+  if (!data.rlDaily || data.rlDaily.length === 0) return 0;
+  const {start, end} = getWeekDates(weekKey);
+  const startStr = start.toISOString().slice(0, 10);
+  const endStr = end.toISOString().slice(0, 10);
+  return data.rlDaily
+    .filter(e => e.date >= startStr && e.date <= endStr)
+    .reduce((sum, e) => sum + (e.amount || 0), 0);
+}
+
+function getRLDailyForMonth(monthKey) {
+  if (!data.rlDaily || data.rlDaily.length === 0) return 0;
+  return data.rlDaily
+    .filter(e => e.date.startsWith(monthKey))
+    .reduce((sum, e) => sum + (e.amount || 0), 0);
+}
+
+function getRLDailyCountForWeek(weekKey) {
+  if (!data.rlDaily || data.rlDaily.length === 0) return 0;
+  const {start, end} = getWeekDates(weekKey);
+  const startStr = start.toISOString().slice(0, 10);
+  const endStr = end.toISOString().slice(0, 10);
+  return data.rlDaily.filter(e => e.date >= startStr && e.date <= endStr).length;
+}
+
+function getRLDailyCountForMonth(monthKey) {
+  if (!data.rlDaily || data.rlDaily.length === 0) return 0;
+  return data.rlDaily.filter(e => e.date.startsWith(monthKey)).length;
+}
+
 function calcWeekRecurringShare() {
   // Recurring expenses divided weekly (1/4 of monthly)
   return data.recurringExpenses.reduce((sum, e) => sum + e.amount, 0) / 4;
@@ -1635,19 +1686,19 @@ function calcWeekProfit(week) {
 }
 
 function getMonthRetouchLab(weekKey) {
-  // Use the same per-field logic as getMonthAggregate
+  // Use the same per-field logic as getMonthAggregate + rlDaily entries
   const dates = getWeekDates(weekKey);
   const monthKey = `${dates.start.getUTCFullYear()}-${String(dates.start.getUTCMonth()+1).padStart(2,'0')}`;
   const agg = getMonthAggregate(monthKey);
-  return calcRetouchLabAgg(agg);
+  return calcRetouchLabAgg(agg) + getRLDailyForMonth(monthKey);
 }
 
 function getMonthIncome(weekKey) {
-  // Use the same per-field logic
+  // Use the same per-field logic + rlDaily entries
   const dates = getWeekDates(weekKey);
   const monthKey = `${dates.start.getUTCFullYear()}-${String(dates.start.getUTCMonth()+1).padStart(2,'0')}`;
   const agg = getMonthAggregate(monthKey);
-  return calcMonthIncome2(agg);
+  return calcMonthIncome2(agg) + getRLDailyForMonth(monthKey);
 }
 
 // ============ TAX CALCULATIONS (Lithuania MB 2026) ============
@@ -1926,9 +1977,9 @@ function renderBriefing() {
   if (wc.lastWeek && wc.lastWeek.users > 0 && wc.usersDelta !== null && wc.usersDelta !== undefined) {
     const arrow = wc.usersDelta >= 0 ? '↑' : '↓';
     const color = wc.usersDelta >= 0 ? '#4ade80' : '#f5a0b0';
-    wcText.innerHTML = `<strong>This week:</strong> ${wc.thisWeek.users} users, ${wc.thisWeek.buyClicks} BUY clicks<br><strong>Last week:</strong> ${wc.lastWeek.users} users, ${wc.lastWeek.buyClicks} BUY clicks<br><span style="color:${color}; font-weight:700;">${arrow} ${Math.abs(wc.usersDelta)}%</span> users vs last week`;
+    wcText.innerHTML = `<strong>Last 7 days:</strong> ${wc.thisWeek.users} users, ${wc.thisWeek.buyClicks} BUY clicks<br><strong>Previous 7 days:</strong> ${wc.lastWeek.users} users, ${wc.lastWeek.buyClicks} BUY clicks<br><span style="color:${color}; font-weight:700;">${arrow} ${Math.abs(wc.usersDelta)}%</span> users vs previous 7 days`;
   } else {
-    wcText.innerHTML = `<strong>This week:</strong> ${wc.thisWeek?.users || 0} users, ${wc.thisWeek?.buyClicks || 0} BUY clicks<br><span style="color:var(--text3);">Not enough data to compare to last week yet</span>`;
+    wcText.innerHTML = `<strong>Last 7 days:</strong> ${wc.thisWeek?.users || 0} users, ${wc.thisWeek?.buyClicks || 0} BUY clicks<br><span style="color:var(--text3);">Not enough data to compare yet</span>`;
   }
 
   // Insights
@@ -1978,6 +2029,26 @@ function renderBriefing() {
       <div class="source-amount">${s.sessions}</div>
     </div>`;
   }).join('') || '<div class="empty" style="padding:16px;"><div class="desc">No data</div></div>';
+
+  // Source conversions table
+  const sourceConversions = b.sourceConversions || [];
+  const scBody = document.getElementById('brSourceBuyTableBody');
+  if (sourceConversions.length > 0) {
+    scBody.innerHTML = sourceConversions.map(s => {
+      const label = s.adContent ? `${s.source} (${s.adContent})` : s.source;
+      const convColor = s.convRate >= 10 ? '#4ade80' : s.convRate >= 3 ? 'var(--text2)' : s.buyTotal > 0 ? '#fbbf24' : 'var(--text3)';
+      return `<tr style="border-top:1px solid var(--border);">
+        <td style="padding:8px 12px; color:var(--text); font-weight:600;">${label}</td>
+        <td style="padding:8px; text-align:right; color:var(--text2); font-variant-numeric:tabular-nums;">${s.users}</td>
+        <td style="padding:8px; text-align:right; color:var(--accent); font-weight:700; font-variant-numeric:tabular-nums;">${s.buyLifetime}</td>
+        <td style="padding:8px; text-align:right; color:var(--text2); font-variant-numeric:tabular-nums;">${s.buySubscription}</td>
+        <td style="padding:8px; text-align:right; color:var(--text); font-weight:700; font-variant-numeric:tabular-nums;">${s.buyTotal}</td>
+        <td style="padding:8px 12px; text-align:right; color:${convColor}; font-weight:600; font-variant-numeric:tabular-nums;">${s.convRate}%</td>
+      </tr>`;
+    }).join('');
+  } else {
+    scBody.innerHTML = '<tr><td colspan="6" style="padding:16px; text-align:center; color:var(--text3); font-size:12px;">No source conversion data yet</td></tr>';
+  }
 
   // New countries
   const newCountries = b.newCountries || [];
@@ -2440,6 +2511,11 @@ function refreshOverview() {
     ads = (agg.ads_meta||0) + (agg.ads_tiktok||0) + (agg.ads_google||0);
     salesCount = agg.rl_count || 0;
     adRevenue = (agg.rl_meta||0) + (agg.rl_tiktok||0);
+    // Add rlDaily entries for the month
+    const rlDailyAmt = getRLDailyForMonth(currentMonth);
+    rl += rlDailyAmt;
+    income += rlDailyAmt;
+    salesCount += getRLDailyCountForMonth(currentMonth);
   } else {
     const week = getWeek(currentWeek);
     income = calcWeekIncome(week);
@@ -2450,6 +2526,11 @@ function refreshOverview() {
     ads = (week.ads_meta||0) + (week.ads_tiktok||0) + (week.ads_google||0);
     salesCount = week.rl_count || 0;
     adRevenue = (week.rl_meta||0) + (week.rl_tiktok||0);
+    // Add rlDaily entries for the week
+    const rlDailyAmt = getRLDailyForWeek(currentWeek);
+    rl += rlDailyAmt;
+    income += rlDailyAmt;
+    salesCount += getRLDailyCountForWeek(currentWeek);
   }
   profit = income - expenses;
 
@@ -2491,7 +2572,7 @@ function refreshOverview() {
     const hasData = weekKeys.some(wk => data.weeks[wk]);
     if (hasData) {
       const prevAgg = getMonthAggregate(prevKey);
-      prevProfit = calcMonthIncome2(prevAgg) - calcMonthExpenses2(prevAgg);
+      prevProfit = calcMonthIncome2(prevAgg) + getRLDailyForMonth(prevKey) - calcMonthExpenses2(prevAgg);
     }
   } else {
     const dates = getWeekDates(currentWeek);
@@ -2499,7 +2580,7 @@ function refreshOverview() {
     prevDate.setUTCDate(prevDate.getUTCDate() - 7);
     const prevKey = getWeekKey(prevDate);
     const prevWeek = data.weeks[prevKey];
-    if (prevWeek) prevProfit = calcWeekProfit(prevWeek);
+    if (prevWeek) prevProfit = calcWeekProfit(prevWeek) + getRLDailyForWeek(prevKey);
   }
   const deltaEl = document.getElementById('ovDelta');
   if (prevProfit !== null) {
