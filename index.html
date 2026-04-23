@@ -500,11 +500,6 @@ body {
       <div class="value">€<span id="ovPhoto">0</span></div>
       <div class="sub">Shopify + grynais</div>
     </div>
-    <div class="metric-card income">
-      <div class="label">Beribu</div>
-      <div class="value">€<span id="ovBeribu">0</span></div>
-      <div class="sub">175€/sav (700€/mėn)</div>
-    </div>
     <div class="metric-card expenses">
       <div class="label">Reklamoms</div>
       <div class="value">€<span id="ovAds">0</span></div>
@@ -738,20 +733,6 @@ body {
   </div>
 
   <div class="entry-section">
-    <div class="entry-section-title"><span class="dot"></span>Beribu (€) — paprastai mėn režimu</div>
-    <div class="entry-row">
-      <div class="entry-icon">💳</div>
-      <div class="entry-label">Į kortelę<span class="desc">~500€/mėn atlyginimas</span></div>
-      <input class="entry-input" type="number" step="0.01" id="in_beribu_card" oninput="saveCurrent()">
-    </div>
-    <div class="entry-row">
-      <div class="entry-icon">💵</div>
-      <div class="entry-label">Grynais<span class="desc">~200€/mėn</span></div>
-      <input class="entry-input" type="number" step="0.01" id="in_beribu_cash" oninput="saveCurrent()">
-    </div>
-  </div>
-
-  <div class="entry-section">
     <div class="entry-section-title"><span class="dot"></span>Reklamos išlaidos (€)</div>
     <div class="entry-row">
       <div class="entry-icon">🎯</div>
@@ -867,10 +848,6 @@ body {
     <div class="settings-item">
       <div class="settings-name">Mėn. atlyginimas sau (€)<span style="display:block;font-size:9px;color:var(--text3);font-weight:500;margin-top:2px;">Lėšos asmeniniam naudojimui</span></div>
       <input class="settings-edit" type="number" id="taxMbSalary" onchange="saveTaxSettings()">
-    </div>
-    <div class="settings-item">
-      <div class="settings-name">Drausta per kitą darbą<span style="display:block;font-size:9px;color:var(--text3);font-weight:500;margin-top:2px;">Beribu — nereikia mokėti PSD</span></div>
-      <input type="checkbox" id="taxPsdExempt" onchange="saveTaxSettings()" style="width:24px;height:24px;accent-color:var(--accent);">
     </div>
     <div class="settings-item">
       <div class="settings-name">PVM ribinė riba (€)<span style="display:block;font-size:9px;color:var(--text3);font-weight:500;margin-top:2px;">Per 12 mėn — privaloma registruotis</span></div>
@@ -1320,14 +1297,11 @@ const DEFAULT_DATA = {
     retouchlab_monthly: 5000,
     total_monthly: 10000
   },
-  beribuMonthlyCard: 500,
-  beribuMonthlyCash: 200,
   tax: {
     mbSalary: 1500, // Mėnesinis atlyginimas iš MB sau
     mbYearStart: '2026-01', // Kada įsteigta MB (pirmi 2 metai = 0% pelno mokestis)
     vatThreshold: 45000, // PVM ribinė riba 12 mėn
-    vatTrackingStart: '2026-01', // Nuo kada skaičiuoti 12 mėn revenue
-    psdExempt: true // Drausta per kitą darbą (Beribu) — nemoka PSD kaip MB narys
+    vatTrackingStart: '2026-01' // Nuo kada skaičiuoti 12 mėn revenue
   }
 };
 
@@ -1346,18 +1320,6 @@ function loadData() {
       if (!parsed.months) parsed.months = {};
       if (!parsed.rlDaily) parsed.rlDaily = [];
       const merged = {...DEFAULT_DATA, ...parsed};
-      // MIGRATION: clean up old Beribu defaults (€125/€50 per week)
-      // These were auto-seeded by old emptyWeek(). Now Beribu is monthly.
-      if (!merged._migratedBeribu) {
-        Object.keys(merged.weeks || {}).forEach(wk => {
-          const w = merged.weeks[wk];
-          if (w && w.beribu_card === 125 && w.beribu_cash === 50) {
-            w.beribu_card = 0;
-            w.beribu_cash = 0;
-          }
-        });
-        merged._migratedBeribu = true;
-      }
       return merged;
     }
   } catch(e) { console.error(e); }
@@ -1369,7 +1331,6 @@ function emptyMonth() {
     rl_instagram: 0, rl_email: 0, rl_influencer: 0,
     rl_meta: 0, rl_tiktok: 0, rl_blog: 0, rl_direct: 0, rl_count: 0,
     photo_shopify: 0, photo_cash: 0,
-    beribu_card: 0, beribu_cash: 0,
     ads_meta: 0, ads_tiktok: 0, ads_google: 0,
     retoucher: 0, buhaltere: 0, extra: 0, extra_notes: '',
     codes_sent: 0, reviews: 0, outreach: 0,
@@ -1608,14 +1569,12 @@ function getWeeksInMonth(monthKey) {
 
 // Aggregate income/expense data over a month
 // PER-FIELD logic: if weekly sum > 0, use weekly; else use monthly entry
-// (avoids double-counting when user enters Beribu monthly + Shopify weekly)
 function getMonthAggregate(monthKey) {
   const weekKeys = getWeeksInMonth(monthKey);
   const FIELDS = [
     'rl_instagram','rl_email','rl_influencer','rl_meta',
     'rl_tiktok','rl_blog','rl_direct','rl_count',
     'photo_shopify','photo_cash',
-    'beribu_card','beribu_cash',
     'ads_meta','ads_tiktok','ads_google',
     'retoucher','buhaltere','extra',
     'codes_sent','reviews','outreach',
@@ -1648,8 +1607,7 @@ function calcRetouchLabAgg(agg) {
 }
 
 function calcMonthIncome2(agg) {
-  return calcRetouchLabAgg(agg) + (agg.photo_shopify||0) + (agg.photo_cash||0) +
-         (agg.beribu_card||0) + (agg.beribu_cash||0);
+  return calcRetouchLabAgg(agg) + (agg.photo_shopify||0) + (agg.photo_cash||0);
 }
 
 function calcMonthExpenses2(agg) {
@@ -1666,7 +1624,6 @@ function emptyWeek() {
     rl_instagram: 0, rl_email: 0, rl_influencer: 0,
     rl_meta: 0, rl_tiktok: 0, rl_blog: 0, rl_direct: 0, rl_count: 0,
     photo_shopify: 0, photo_cash: 0,
-    beribu_card: 0, beribu_cash: 0,
     ads_meta: 0, ads_tiktok: 0, ads_google: 0,
     retoucher: 0, buhaltere: 0, extra: 0, extra_notes: '',
     codes_sent: 0, reviews: 0, outreach: 0,
@@ -1687,8 +1644,7 @@ function calcRetouchLab(week) {
 }
 
 function calcWeekIncome(week) {
-  return calcRetouchLab(week) + (week.photo_shopify||0) + (week.photo_cash||0) +
-         (week.beribu_card||0) + (week.beribu_cash||0);
+  return calcRetouchLab(week) + (week.photo_shopify||0) + (week.photo_cash||0);
 }
 
 // rlDaily helpers — sum daily revenue entries for a given week or month
@@ -1792,9 +1748,8 @@ function calcMonthlyTaxes(salary, currentMonth) {
   }
   const gpm = salary * gpmRate;
 
-  // PSD — fiksuotas, BET jei drausta per kitą darbą (psdExempt) → 0
-  const psdExempt = data.tax?.psdExempt || false;
-  const psd = psdExempt ? 0 : TAX_RATES.PSD_MONTHLY;
+  // PSD — fiksuotas
+  const psd = TAX_RATES.PSD_MONTHLY;
 
   // VSD bazė priklausomai nuo mėnesio
   const isFirstHalf2026 = (year === 2026 && mon <= 6);
@@ -1805,19 +1760,15 @@ function calcMonthlyTaxes(salary, currentMonth) {
   const totalTax = gpm + psd + vsd;
   const totalCostToMB = salary + totalTax;
 
-  let notes = isFirstHalf2026
+  const notes = isFirstHalf2026
     ? 'VSD bazė 50% (Sausis-Birželis 2026)'
     : 'VSD bazė 90% (Liepa+ 2026)';
-  if (psdExempt) {
-    notes += ' · PSD nemokama (drausta per kitą darbą)';
-  }
 
   return {
     salary,        // Tau į ranką
     gpm,
     gpmRate: gpmRate * 100,
     psd,
-    psdExempt,
     vsd,
     vsdBase,
     vsdBaseFactor: vsdBaseFactor * 100,
@@ -2617,7 +2568,7 @@ function renderInsights() {
 }
 
 function refreshOverview() {
-  let income, expenses, profit, rl, photo, beribu, ads, salesCount, adRevenue;
+  let income, expenses, profit, rl, photo, ads, salesCount, adRevenue;
   let isMonth = currentPeriod === 'month';
 
   if (isMonth) {
@@ -2626,7 +2577,6 @@ function refreshOverview() {
     expenses = calcMonthExpenses2(agg);
     rl = calcRetouchLabAgg(agg);
     photo = (agg.photo_shopify||0) + (agg.photo_cash||0);
-    beribu = (agg.beribu_card||0) + (agg.beribu_cash||0);
     ads = (agg.ads_meta||0) + (agg.ads_tiktok||0) + (agg.ads_google||0);
     salesCount = agg.rl_count || 0;
     adRevenue = (agg.rl_meta||0) + (agg.rl_tiktok||0);
@@ -2641,7 +2591,6 @@ function refreshOverview() {
     expenses = calcWeekExpenses(week);
     rl = calcRetouchLab(week);
     photo = (week.photo_shopify||0) + (week.photo_cash||0);
-    beribu = (week.beribu_card||0) + (week.beribu_cash||0);
     ads = (week.ads_meta||0) + (week.ads_tiktok||0) + (week.ads_google||0);
     salesCount = week.rl_count || 0;
     adRevenue = (week.rl_meta||0) + (week.rl_tiktok||0);
@@ -2663,13 +2612,7 @@ function refreshOverview() {
   document.getElementById('ovRL').textContent = fmt(rl);
   document.getElementById('ovRLSales').textContent = salesCount;
   document.getElementById('ovPhoto').textContent = fmt(photo);
-  document.getElementById('ovBeribu').textContent = fmt(beribu);
   document.getElementById('ovAds').textContent = fmt(ads);
-
-  // Update Beribu sub-label
-  document.querySelector('.metric-card .label + .value + .sub')?.textContent;
-  const beribuSubs = document.querySelectorAll('.metric-card .sub');
-  if (beribuSubs[2]) beribuSubs[2].textContent = isMonth ? '500€ kortele + 200€ grynais' : '125€/sav (500€/mėn)';
 
   // Ad ROI
   if (ads > 0) {
@@ -2754,7 +2697,7 @@ function refreshOverview() {
   document.getElementById('taxTotalCost').textContent = fmt(taxes.totalCostToMB);
   document.getElementById('taxGpm').textContent = fmt(taxes.gpm);
   document.getElementById('taxGpmRate').textContent = taxes.gpmRate;
-  document.getElementById('taxPsd').textContent = taxes.psdExempt ? '0 ✓' : fmt(taxes.psd);
+  document.getElementById('taxPsd').textContent = fmt(taxes.psd);
   document.getElementById('taxVsd').textContent = fmt(taxes.vsd);
   document.getElementById('taxTotal').textContent = fmt(taxes.totalTax);
   document.getElementById('taxNote').textContent = taxes.notes;
@@ -3112,7 +3055,7 @@ function refreshRetouchLab() {
 
 const ENTRY_FIELDS = [
   'rl_instagram','rl_email','rl_influencer','rl_meta','rl_tiktok','rl_blog','rl_direct','rl_count',
-  'photo_shopify','photo_cash','beribu_card','beribu_cash',
+  'photo_shopify','photo_cash',
   'ads_meta','ads_tiktok','ads_google','retoucher','buhaltere','extra',
   'codes_sent','reviews','outreach'
 ];
@@ -3192,7 +3135,7 @@ function refreshHistory() {
       months[monthKey] = {
         income: 0, rl: 0, expenses: 0, count: 0,
         rl_instagram:0, rl_email:0, rl_influencer:0, rl_meta:0, rl_tiktok:0, rl_blog:0, rl_direct:0,
-        photo_shopify:0, photo_cash:0, beribu_card:0, beribu_cash:0
+        photo_shopify:0, photo_cash:0
       };
     }
     const w = data.weeks[wk];
@@ -3201,7 +3144,7 @@ function refreshHistory() {
     months[monthKey].expenses += calcWeekExpenses(w);
     months[monthKey].count++;
     ['rl_instagram','rl_email','rl_influencer','rl_meta','rl_tiktok','rl_blog','rl_direct',
-     'photo_shopify','photo_cash','beribu_card','beribu_cash'].forEach(k => {
+     'photo_shopify','photo_cash'].forEach(k => {
       months[monthKey][k] += w[k] || 0;
     });
   });
@@ -3227,7 +3170,6 @@ function refreshHistory() {
       const [year, month] = mk.split('-');
       const profit = m.income - (m.expenses + data.recurringExpenses.reduce((s,e)=>s+e.amount, 0));
       const photo = m.photo_shopify + m.photo_cash;
-      const beribu = m.beribu_card + m.beribu_cash;
       return `
         <div class="history-row" onclick="currentMonth='${mk}'; showPage('overview');" style="display:block; padding:16px;">
           <div style="display:flex; align-items:center; gap:14px; margin-bottom:10px;">
@@ -3243,7 +3185,7 @@ function refreshHistory() {
               ${profit >= 0 ? '+' : ''}${fmt(profit)}€
             </div>
           </div>
-          <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; padding-top:10px; border-top:1px solid var(--border);">
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; padding-top:10px; border-top:1px solid var(--border);">
             <div>
               <div style="font-size:9px; color:var(--text3); font-weight:700; text-transform:uppercase; letter-spacing:0.4px;">RetouchLab</div>
               <div style="font-family:'Archivo Black',sans-serif; font-size:14px; color:var(--accent); margin-top:2px;">${fmt(m.rl)}€</div>
@@ -3251,10 +3193,6 @@ function refreshHistory() {
             <div>
               <div style="font-size:9px; color:var(--text3); font-weight:700; text-transform:uppercase; letter-spacing:0.4px;">Foto</div>
               <div style="font-family:'Archivo Black',sans-serif; font-size:14px; color:var(--text); margin-top:2px;">${fmt(photo)}€</div>
-            </div>
-            <div>
-              <div style="font-size:9px; color:var(--text3); font-weight:700; text-transform:uppercase; letter-spacing:0.4px;">Beribu</div>
-              <div style="font-family:'Archivo Black',sans-serif; font-size:14px; color:var(--text); margin-top:2px;">${fmt(beribu)}€</div>
             </div>
           </div>
         </div>
@@ -3337,7 +3275,6 @@ function refreshSettings() {
 
   // Tax settings
   document.getElementById('taxMbSalary').value = data.tax?.mbSalary || 1500;
-  document.getElementById('taxPsdExempt').checked = data.tax?.psdExempt || false;
   document.getElementById('taxVatThreshold').value = data.tax?.vatThreshold || 45000;
 
   // GitHub status
@@ -3398,7 +3335,6 @@ function saveGoals() {
 function saveTaxSettings() {
   if (!data.tax) data.tax = {};
   data.tax.mbSalary = parseFloat(document.getElementById('taxMbSalary').value) || 1500;
-  data.tax.psdExempt = document.getElementById('taxPsdExempt').checked;
   data.tax.vatThreshold = parseFloat(document.getElementById('taxVatThreshold').value) || 45000;
   saveData();
   showSaveToast();
