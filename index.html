@@ -650,24 +650,25 @@ body {
 <div class="page" id="page-retouchlab">
 
   <div class="hero-card">
-    <div class="hero-label">RetouchLab šią savaitę</div>
+    <div class="hero-label" id="rlHeroLabel">RetouchLab šį mėnesį</div>
     <div class="hero-amount"><span class="currency">€</span><span id="rlTotal">0</span></div>
     <div class="hero-sub">
       <span><strong id="rlSalesCount">0</strong> pardavimai</span>
       <span><strong id="rlAvgPrice">0€</strong> vidut. kaina</span>
     </div>
+    <div class="hero-delta flat" id="rlMonthProgress">—</div>
   </div>
 
   <div class="metric-grid">
     <div class="metric-card profit">
-      <div class="label">Šio mėnesio iš viso</div>
-      <div class="value">€<span id="rlMonth">0</span></div>
-      <div class="sub" id="rlMonthDelta">—</div>
+      <div class="label">Viso nuo pradžios</div>
+      <div class="value">€<span id="rlAllTime">0</span></div>
+      <div class="sub" id="rlAllTimeSub">nuo pirmojo pardavimo</div>
     </div>
     <div class="metric-card retouchlab">
       <div class="label">€5k tikslas</div>
       <div class="value"><span id="rlGoalPct">0</span>%</div>
-      <div class="sub">iki birželio 30</div>
+      <div class="sub" id="rlGoalSub">—</div>
     </div>
   </div>
 
@@ -1893,7 +1894,7 @@ function showPage(page) {
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.page === page));
 
   // Context-lock period by page
-  if (page === 'overview') {
+  if (page === 'overview' || page === 'retouchlab') {
     currentPeriod = 'month';
     localStorage.setItem('finance-period', 'month');
   } else if (page === 'history') {
@@ -1907,7 +1908,7 @@ function showPage(page) {
 
   // Hide period toggle on context-locked pages
   const toggle = document.querySelector('.period-toggle');
-  if (toggle) toggle.style.display = (page === 'overview' || page === 'history') ? 'none' : '';
+  if (toggle) toggle.style.display = (page === 'overview' || page === 'history' || page === 'retouchlab') ? 'none' : '';
 
   const titles = {
     overview: 'Apžvalga',
@@ -3061,19 +3062,18 @@ function deleteDailyEntry(index) {
 function renderDailyRevenue() {
   if (!data.rlDaily) data.rlDaily = [];
 
-  // Sort by date descending
-  const sorted = [...data.rlDaily].sort((a, b) => b.date.localeCompare(a.date));
-
-  // Current month filter
-  const now = new Date();
-  const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  const monthEntries = sorted.filter(e => e.date.startsWith(currentMonthKey));
+  // Show entries for the month being viewed (currentMonth), not always "today's" month.
+  // Sort by date descending.
+  const monthEntries = data.rlDaily
+    .filter(e => e.date && e.date.startsWith(currentMonth))
+    .sort((a, b) => b.date.localeCompare(a.date));
+  const sorted = monthEntries;
 
   // Render list (show last 14 entries)
   const listEl = document.getElementById('rlDailyList');
   if (sorted.length === 0) {
     listEl.innerHTML = `<div style="background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:20px; text-align:center; color:var(--text3); font-size:12px;">
-      No daily revenue entries yet. Press "+ Add" to log your first sale.
+      Šį mėnesį dar nėra įrašų. Spausk "+ Add" ir įvesk dienos pardavimą.
     </div>`;
   } else {
     const typeIcons = { lifetime: '💎', subscription: '🔄', total: '💰' };
@@ -3113,83 +3113,125 @@ function renderDailyRevenue() {
     uniqueDays >= 3 ? `→ €${fmt(projection)}/month projected` : 'Need 3+ days for projection';
 }
 
+function getRLForMonth(monthKey) {
+  // Daily entries take priority; fall back to legacy RL fields.
+  const daily = getRLDailyForMonth(monthKey);
+  if (daily > 0) return daily;
+  const agg = getMonthAggregate(monthKey);
+  return calcRetouchLabAgg(agg);
+}
+
+function getRLCountForMonth(monthKey) {
+  const dailyCount = getRLDailyCountForMonth(monthKey);
+  if (dailyCount > 0) return dailyCount;
+  const agg = getMonthAggregate(monthKey);
+  return agg.rl_count || 0;
+}
+
+function getRLAllTime() {
+  // Sum every daily entry + every legacy monthly RL field.
+  // (Weekly legacy fields are already inside months via getMonthAggregate —
+  // but to avoid missing any, we sum data.months entries directly.)
+  let total = 0;
+  (data.rlDaily || []).forEach(e => total += e.amount || 0);
+  // Legacy per-month RL (zero after wipe, but count anything entered later).
+  Object.entries(data.months || {}).forEach(([mk, m]) => {
+    // Only count legacy fields if there are NO daily entries for that month,
+    // otherwise we'd double-count (daily takes priority).
+    if (getRLDailyForMonth(mk) > 0) return;
+    total += (m.rl_instagram||0) + (m.rl_email||0) + (m.rl_influencer||0) +
+             (m.rl_meta||0) + (m.rl_tiktok||0) + (m.rl_blog||0) + (m.rl_direct||0);
+  });
+  return total;
+}
+
+function getRLFirstEntryDate() {
+  const dates = [];
+  (data.rlDaily || []).forEach(e => { if (e.date) dates.push(e.date); });
+  if (dates.length === 0) return null;
+  return dates.sort()[0];
+}
+
 function refreshRetouchLab() {
-  let total, count;
-  let isMonth = currentPeriod === 'month';
+  // Locked to monthly view.
+  const monthTotal = getRLForMonth(currentMonth);
+  const monthCount = getRLCountForMonth(currentMonth);
+  const avg = monthCount > 0 ? monthTotal / monthCount : 0;
 
-  // RL priority: if rlDaily has entries for the period, use daily only.
-  // Fall back to legacy weekly/monthly RL fields only when no daily exists.
-  if (isMonth) {
-    const rlDailyAmt = getRLDailyForMonth(currentMonth);
-    const rlDailyCount = getRLDailyCountForMonth(currentMonth);
-    if (rlDailyAmt > 0 || rlDailyCount > 0) {
-      total = rlDailyAmt;
-      count = rlDailyCount;
-    } else {
-      const agg = getMonthAggregate(currentMonth);
-      total = calcRetouchLabAgg(agg);
-      count = agg.rl_count || 0;
-    }
-  } else {
-    const rlDailyAmt = getRLDailyForWeek(currentWeek);
-    const rlDailyCount = getRLDailyCountForWeek(currentWeek);
-    if (rlDailyAmt > 0 || rlDailyCount > 0) {
-      total = rlDailyAmt;
-      count = rlDailyCount;
-    } else {
-      const week = getWeek(currentWeek);
-      total = calcRetouchLab(week);
-      count = week.rl_count || 0;
-    }
-  }
-  const avg = count > 0 ? total / count : 0;
-
-  // Update labels
-  document.querySelector('#page-retouchlab .hero-card .hero-label').textContent =
-    isMonth ? 'RetouchLab šį mėnesį' : 'RetouchLab šią savaitę';
-
-  document.getElementById('rlTotal').textContent = fmt(total);
-  document.getElementById('rlSalesCount').textContent = count;
+  // Hero label with current month name
+  const [yearStr, monthStr] = currentMonth.split('-');
+  const monthName = MONTH_NAMES_LT[parseInt(monthStr) - 1];
+  document.getElementById('rlHeroLabel').textContent = `RetouchLab · ${monthName} ${yearStr}`;
+  document.getElementById('rlTotal').textContent = fmt(monthTotal);
+  document.getElementById('rlSalesCount').textContent = monthCount;
   document.getElementById('rlAvgPrice').textContent = fmt(avg)+'€';
 
-  // Month total (always use daily priority)
-  const monthDailyAmt = getRLDailyForMonth(currentMonth);
-  const monthAgg = getMonthAggregate(currentMonth);
-  const monthRL = monthDailyAmt > 0 ? monthDailyAmt : calcRetouchLabAgg(monthAgg);
-  document.getElementById('rlMonth').textContent = fmt(monthRL);
+  // Month-progress indicator (days elapsed / days in month, on-pace check)
+  const {start: mStart, end: mEnd} = getMonthDates(currentMonth);
+  const daysInMonth = mEnd.getUTCDate();
+  const now = new Date();
+  const viewingCurrentMonth = getMonthKey(now) === currentMonth;
+  const todayDay = viewingCurrentMonth ? now.getDate() : daysInMonth;
+  const daysElapsed = Math.min(todayDay, daysInMonth);
+  const daysLeft = Math.max(0, daysInMonth - daysElapsed);
+  const monthOver = !viewingCurrentMonth || daysLeft === 0;
 
-  const pct = (monthRL / data.goals.retouchlab_monthly * 100).toFixed(0);
-  document.getElementById('rlGoalPct').textContent = pct;
+  const goal = data.goals.retouchlab_monthly || 5000;
+  const pct = (monthTotal / goal * 100);
+  const pace = daysElapsed > 0 ? (monthTotal / daysElapsed) * daysInMonth : 0; // projected end-of-month
 
-  // Chart - last 8 weeks (include daily priority)
-  const dates = getWeekDates(currentWeek);
-  const weeks = [];
-  for (let i = 7; i >= 0; i--) {
-    const d = new Date(dates.start);
-    d.setUTCDate(d.getUTCDate() - i * 7);
-    weeks.push(getWeekKey(d));
+  const progEl = document.getElementById('rlMonthProgress');
+  if (monthOver) {
+    progEl.className = 'hero-delta flat';
+    progEl.textContent = `Mėnuo baigėsi · ${daysInMonth}/${daysInMonth} d.`;
+  } else {
+    const onPace = pace >= goal;
+    progEl.className = `hero-delta ${onPace ? 'up' : 'down'}`;
+    progEl.textContent = `${daysElapsed}/${daysInMonth} d. · Projekcija ${fmt(pace)}€ (${onPace ? '✓ tempe' : 'žemiau tempo'})`;
   }
-  const weekRL = wk => {
-    const dailyAmt = getRLDailyForWeek(wk);
-    if (dailyAmt > 0) return dailyAmt;
-    return data.weeks[wk] ? calcRetouchLab(data.weeks[wk]) : 0;
-  };
-  const max = Math.max(...weeks.map(weekRL), 100);
-  const chartHTML = weeks.map(wk => {
-    const amount = weekRL(wk);
+
+  // Goal %
+  document.getElementById('rlGoalPct').textContent = pct.toFixed(0);
+  document.getElementById('rlGoalSub').textContent =
+    monthTotal >= goal ? '✓ Pasiekta' : `Trūksta ${fmt(goal - monthTotal)}€`;
+
+  // All-time total
+  const allTime = getRLAllTime();
+  document.getElementById('rlAllTime').textContent = fmt(allTime);
+  const firstDate = getRLFirstEntryDate();
+  document.getElementById('rlAllTimeSub').textContent =
+    firstDate ? `nuo ${firstDate}` : 'nuo pirmojo pardavimo';
+
+  // Chart — last 6 months
+  const months = [];
+  const cur = new Date(Date.UTC(parseInt(yearStr), parseInt(monthStr) - 1, 1));
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(cur);
+    d.setUTCMonth(d.getUTCMonth() - i);
+    months.push(getMonthKey(d));
+  }
+  const monthVals = months.map(getRLForMonth);
+  const max = Math.max(...monthVals, 100);
+  const chartHTML = months.map((mk, i) => {
+    const amount = monthVals[i];
     const height = max > 0 ? (amount / max * 100) : 0;
-    const wnum = wk.split('-W')[1];
+    const mNum = parseInt(mk.split('-')[1]);
+    const short = MONTH_NAMES_LT[mNum - 1].slice(0, 3);
     return `
-      <div class="chart-bar-wrap" onclick="currentWeek='${wk}'; refreshAll();">
+      <div class="chart-bar-wrap" onclick="currentMonth='${mk}'; refreshAll();">
         <div class="chart-value">${amount > 0 ? fmt(amount) : ''}</div>
         <div class="chart-bar ${amount === 0 ? 'empty' : ''}" style="height:${Math.max(2, height)}%"></div>
-        <div class="chart-label">W${wnum}</div>
+        <div class="chart-label">${short}</div>
       </div>
     `;
   }).join('');
   document.getElementById('rlChart').innerHTML = chartHTML;
 
-  // Daily revenue tracker
+  // Section title for chart
+  const chartTitleEl = document.querySelector('#page-retouchlab .chart-title');
+  if (chartTitleEl) chartTitleEl.textContent = 'RetouchLab pajamos (6 mėn)';
+  const chartSectionTitle = document.querySelector('#page-retouchlab .section-header:last-of-type .section-title');
+  // Daily revenue tracker for the current month
   renderDailyRevenue();
 }
 
