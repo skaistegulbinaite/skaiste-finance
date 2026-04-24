@@ -653,13 +653,6 @@ body {
   </div>
 
   <div class="section-header">
-    <div class="section-title">Iš kur atėjo pinigai</div>
-    <button class="section-action" onclick="showPage('entry')">Įvesti</button>
-  </div>
-
-  <div class="source-list" id="rlSources"></div>
-
-  <div class="section-header">
     <div class="section-title">Paskutinės 8 savaitės</div>
   </div>
 
@@ -668,11 +661,7 @@ body {
     <div class="chart-bars" id="rlChart"></div>
   </div>
 
-  <div class="section-header">
-    <div class="section-title">Kas veikė šią savaitę</div>
-  </div>
 
-  <div id="rlInsights"></div>
 
 </div>
 
@@ -2937,17 +2926,33 @@ function renderDailyRevenue() {
 }
 
 function refreshRetouchLab() {
-  let dataset, total, count;
+  let total, count;
   let isMonth = currentPeriod === 'month';
 
+  // RL priority: if rlDaily has entries for the period, use daily only.
+  // Fall back to legacy weekly/monthly RL fields only when no daily exists.
   if (isMonth) {
-    dataset = getMonthAggregate(currentMonth);
-    total = calcRetouchLabAgg(dataset);
-    count = dataset.rl_count || 0;
+    const rlDailyAmt = getRLDailyForMonth(currentMonth);
+    const rlDailyCount = getRLDailyCountForMonth(currentMonth);
+    if (rlDailyAmt > 0 || rlDailyCount > 0) {
+      total = rlDailyAmt;
+      count = rlDailyCount;
+    } else {
+      const agg = getMonthAggregate(currentMonth);
+      total = calcRetouchLabAgg(agg);
+      count = agg.rl_count || 0;
+    }
   } else {
-    dataset = getWeek(currentWeek);
-    total = calcRetouchLab(dataset);
-    count = dataset.rl_count || 0;
+    const rlDailyAmt = getRLDailyForWeek(currentWeek);
+    const rlDailyCount = getRLDailyCountForWeek(currentWeek);
+    if (rlDailyAmt > 0 || rlDailyCount > 0) {
+      total = rlDailyAmt;
+      count = rlDailyCount;
+    } else {
+      const week = getWeek(currentWeek);
+      total = calcRetouchLab(week);
+      count = week.rl_count || 0;
+    }
   }
   const avg = count > 0 ? total / count : 0;
 
@@ -2959,41 +2964,16 @@ function refreshRetouchLab() {
   document.getElementById('rlSalesCount').textContent = count;
   document.getElementById('rlAvgPrice').textContent = fmt(avg)+'€';
 
-  const monthRL = isMonth ? total : getMonthRetouchLab(currentWeek);
+  // Month total (always use daily priority)
+  const monthDailyAmt = getRLDailyForMonth(currentMonth);
+  const monthAgg = getMonthAggregate(currentMonth);
+  const monthRL = monthDailyAmt > 0 ? monthDailyAmt : calcRetouchLabAgg(monthAgg);
   document.getElementById('rlMonth').textContent = fmt(monthRL);
 
   const pct = (monthRL / data.goals.retouchlab_monthly * 100).toFixed(0);
   document.getElementById('rlGoalPct').textContent = pct;
-  // Use dataset for sources
-  const week = dataset;
 
-  // Sources list
-  const sources = [
-    {key:'rl_instagram', name:'Instagram organic', icon:'📷'},
-    {key:'rl_email', name:'Email marketing', icon:'📧'},
-    {key:'rl_influencer', name:'Influenceriai', icon:'💁'},
-    {key:'rl_meta', name:'Meta reklamos', icon:'🎯'},
-    {key:'rl_tiktok', name:'TikTok reklamos', icon:'🎵'},
-    {key:'rl_blog', name:'Blog/review', icon:'📝'},
-    {key:'rl_direct', name:'Tiesioginis / Google', icon:'🔗'}
-  ];
-  const sourceHTML = sources.map(s => {
-    const amount = week[s.key] || 0;
-    const pctStr = total > 0 ? `${(amount/total*100).toFixed(0)}%` : '';
-    return `
-      <div class="source-row">
-        <div class="source-icon">${s.icon}</div>
-        <div class="source-info">
-          <div class="source-name">${s.name}</div>
-          <div class="source-meta">${pctStr}</div>
-        </div>
-        <div class="source-amount ${amount === 0 ? 'empty' : ''}">${fmt(amount)}€</div>
-      </div>
-    `;
-  }).join('');
-  document.getElementById('rlSources').innerHTML = sourceHTML;
-
-  // Chart - last 8 weeks
+  // Chart - last 8 weeks (include daily priority)
   const dates = getWeekDates(currentWeek);
   const weeks = [];
   for (let i = 7; i >= 0; i--) {
@@ -3001,9 +2981,14 @@ function refreshRetouchLab() {
     d.setUTCDate(d.getUTCDate() - i * 7);
     weeks.push(getWeekKey(d));
   }
-  const max = Math.max(...weeks.map(wk => data.weeks[wk] ? calcRetouchLab(data.weeks[wk]) : 0), 100);
+  const weekRL = wk => {
+    const dailyAmt = getRLDailyForWeek(wk);
+    if (dailyAmt > 0) return dailyAmt;
+    return data.weeks[wk] ? calcRetouchLab(data.weeks[wk]) : 0;
+  };
+  const max = Math.max(...weeks.map(weekRL), 100);
   const chartHTML = weeks.map(wk => {
-    const amount = data.weeks[wk] ? calcRetouchLab(data.weeks[wk]) : 0;
+    const amount = weekRL(wk);
     const height = max > 0 ? (amount / max * 100) : 0;
     const wnum = wk.split('-W')[1];
     return `
@@ -3015,47 +3000,6 @@ function refreshRetouchLab() {
     `;
   }).join('');
   document.getElementById('rlChart').innerHTML = chartHTML;
-
-  // RL insights
-  const insights = [];
-  if (total > 0) {
-    const sortedSources = sources.map(s => ({...s, amount: week[s.key]||0})).sort((a,b) => b.amount - a.amount);
-    const top = sortedSources[0];
-    if (top.amount > 0) {
-      insights.push({
-        type: 'success',
-        icon: top.icon,
-        title: `${top.name} — top šaltinis`,
-        text: `${fmt(top.amount)}€ (${(top.amount/total*100).toFixed(0)}%) iš viso savaitės pajamų.`
-      });
-    }
-    const zeros = sortedSources.filter(s => s.amount === 0);
-    if (zeros.length > 0 && zeros.length < sources.length) {
-      insights.push({
-        type: 'warning',
-        icon: '💡',
-        title: 'Neišnaudoti šaltiniai',
-        text: `Šią savaitę pardavimų neatėjo iš: ${zeros.map(z => z.name).join(', ')}.`
-      });
-    }
-  } else {
-    insights.push({
-      type: 'warning',
-      icon: '📝',
-      title: 'Nėra įvestų pardavimų',
-      text: 'Spausk "Įvesti" ir suvesk šios savaitės RetouchLab pardavimus.'
-    });
-  }
-  const rlInsightsHTML = insights.map(i => `
-    <div class="insight-card ${i.type === 'danger' ? 'danger' : i.type === 'warning' ? 'warning' : ''}">
-      <div class="insight-icon">${i.icon}</div>
-      <div class="insight-body">
-        <div class="insight-title">${i.title}</div>
-        <div class="insight-text">${i.text}</div>
-      </div>
-    </div>
-  `).join('');
-  document.getElementById('rlInsights').innerHTML = rlInsightsHTML;
 
   // Daily revenue tracker
   renderDailyRevenue();
