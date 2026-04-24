@@ -1329,13 +1329,16 @@ function loadData() {
 }
 
 // One-time income reset — user is re-entering income manually.
-// Keeps: expenses, ads, goals, salary, tax, recurringExpenses, codes_sent, reviews, outreach, notes.
+// Keeps: photo_cash (user's photography cash is correct), expenses, ads, goals,
+//        salary, tax, recurringExpenses, codes_sent, reviews, outreach, notes.
+// v2: wiped everything (photo_cash included).
+// v3: keeps photo_cash. User re-entering RL / Shopify photo / Beribu from scratch.
 const INCOME_FIELDS = [
   'rl_instagram','rl_email','rl_influencer','rl_meta','rl_tiktok','rl_blog','rl_direct','rl_count',
-  'photo_shopify','photo_cash','beribu_card','beribu_cash'
+  'photo_shopify','beribu_card','beribu_cash'
 ];
 function wipeIncomeOnce(d) {
-  if (d.incomeWiped_v2) return d;
+  if (d.incomeWiped_v3) return d;
   Object.values(d.weeks || {}).forEach(w => {
     INCOME_FIELDS.forEach(k => { if (k in w) w[k] = 0; });
   });
@@ -1344,6 +1347,7 @@ function wipeIncomeOnce(d) {
   });
   d.rlDaily = [];
   d.incomeWiped_v2 = true;
+  d.incomeWiped_v3 = true;
   return d;
 }
 
@@ -1398,7 +1402,7 @@ async function loadFromGitHub() {
     // If income was wiped locally but remote is pre-wipe, apply the same wipe to remote
     // content before merging — otherwise the old income comes right back.
     let wipedRemote = false;
-    if (data.incomeWiped_v2 && !content.incomeWiped_v2) {
+    if (data.incomeWiped_v3 && !content.incomeWiped_v3) {
       Object.values(content.weeks || {}).forEach(w => {
         INCOME_FIELDS.forEach(k => { if (k in w) w[k] = 0; });
       });
@@ -1407,6 +1411,7 @@ async function loadFromGitHub() {
       });
       content.rlDaily = [];
       content.incomeWiped_v2 = true;
+      content.incomeWiped_v3 = true;
       wipedRemote = true;
     }
 
@@ -1448,6 +1453,7 @@ async function loadFromGitHub() {
     // so the fresh state is persisted (otherwise next load re-pulls old income).
     if (wipedRemote) {
       data.incomeWiped_v2 = true;
+      data.incomeWiped_v3 = true;
       await syncToGitHub();
     }
   } catch(e) {
