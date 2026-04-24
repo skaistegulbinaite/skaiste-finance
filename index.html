@@ -3345,8 +3345,8 @@ function clearAllData() {
   }
 }
 
-// Init
-refreshAll();
+// Init — use showPage to apply context-locked period (overview=month)
+showPage('overview');
 // Auto-load from GitHub if token is set
 if (ghToken) {
   loadFromGitHub();
