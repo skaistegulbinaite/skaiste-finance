@@ -778,20 +778,14 @@ body {
 
 </div>
 
-<!-- ============ PAGE: HISTORY ============ -->
+<!-- ============ PAGE: HISTORY (Savaitės) ============ -->
 <div class="page" id="page-history">
 
   <div class="section-header">
-    <div class="section-title">Visos savaitės</div>
+    <div class="section-title">Savaitės pagal šaltinį</div>
   </div>
 
   <div id="historyList"></div>
-
-  <div class="section-header">
-    <div class="section-title">Mėnesių suvestinė</div>
-  </div>
-
-  <div id="monthsList"></div>
 
 </div>
 
@@ -1211,8 +1205,8 @@ body {
     Briefing
   </button>
   <button class="nav-btn" data-page="history" onclick="showPage('history')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
-    Istorija
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+    Savaitės
   </button>
   <button class="nav-btn" data-page="settings" onclick="showPage('settings')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -1798,13 +1792,30 @@ function showPage(page) {
   document.getElementById('page-'+page).classList.add('active');
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.page === page));
 
+  // Context-lock period by page
+  if (page === 'overview') {
+    currentPeriod = 'month';
+    localStorage.setItem('finance-period', 'month');
+  } else if (page === 'history') {
+    currentPeriod = 'week';
+    localStorage.setItem('finance-period', 'week');
+  }
+
+  // Sync period toggle UI
+  document.getElementById('periodWeek')?.classList.toggle('active', currentPeriod === 'week');
+  document.getElementById('periodMonth')?.classList.toggle('active', currentPeriod === 'month');
+
+  // Hide period toggle on context-locked pages
+  const toggle = document.querySelector('.period-toggle');
+  if (toggle) toggle.style.display = (page === 'overview' || page === 'history') ? 'none' : '';
+
   const titles = {
     overview: 'Apžvalga',
     retouchlab: 'RetouchLab',
     entry: 'Įvesti',
     briefing: 'Briefing',
     insights: 'Insights',
-    history: 'Istorija',
+    history: 'Savaitės',
     settings: 'Nustatymai'
   };
   document.getElementById('headerTitle').textContent = titles[page];
@@ -3213,55 +3224,54 @@ function refreshHistory() {
     if (sectionTitles[0]) sectionTitles[0].textContent = 'Visi mėnesiai';
     if (sectionTitles[1]) sectionTitles[1].textContent = '';
   } else {
-    // Show weeks in main list
+    // Weekly view with per-source breakdown
     const weeksHtml = sortedWeeks.map(wk => {
       const week = data.weeks[wk];
-      const income = calcWeekIncome(week);
+      const rlDailyAmt = getRLDailyForWeek(wk);
+      const rl = rlDailyAmt > 0 ? rlDailyAmt : calcRetouchLab(week);
+      const photo = (week.photo_shopify||0) + (week.photo_cash||0);
+      const beribu = (week.beribu_card||0) + (week.beribu_cash||0);
+      const income = rl + photo + beribu;
       const expenses = calcWeekExpenses(week);
       const profit = income - expenses;
-      const rl = calcRetouchLab(week);
       const dates = getWeekDates(wk);
       const wnum = wk.split('-W')[1];
       return `
-        <div class="history-row" onclick="currentWeek='${wk}'; showPage('overview');">
-          <div class="history-week">
-            <div class="num">${wnum}</div>
-            <div class="lbl">savaitė</div>
+        <div class="history-row" onclick="currentWeek='${wk}'; showPage('overview');" style="display:block; padding:16px;">
+          <div style="display:flex; align-items:center; gap:14px; margin-bottom:10px;">
+            <div class="history-week">
+              <div class="num">W${wnum}</div>
+              <div class="lbl">${formatDate(dates.start)}</div>
+            </div>
+            <div class="history-info">
+              <div class="history-amount">${fmt(income)}€</div>
+              <div class="history-sub">${formatDate(dates.start)}–${formatDate(dates.end)}</div>
+            </div>
+            <div class="history-pill ${profit >= 0 ? 'profit' : 'loss'}">
+              ${profit >= 0 ? '+' : ''}${fmt(profit)}€
+            </div>
           </div>
-          <div class="history-info">
-            <div class="history-amount">${fmt(income)}€</div>
-            <div class="history-sub">${formatDate(dates.start)}–${formatDate(dates.end)} · RL ${fmt(rl)}€</div>
-          </div>
-          <div class="history-pill ${profit >= 0 ? 'profit' : 'loss'}">
-            ${profit >= 0 ? '+' : ''}${fmt(profit)}€
+          <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; padding-top:10px; border-top:1px solid var(--border);">
+            <div>
+              <div style="font-size:9px; color:var(--text3); font-weight:700; text-transform:uppercase; letter-spacing:0.4px;">RetouchLab</div>
+              <div style="font-family:'Archivo Black',sans-serif; font-size:14px; color:var(--accent); margin-top:2px;">${fmt(rl)}€</div>
+            </div>
+            <div>
+              <div style="font-size:9px; color:var(--text3); font-weight:700; text-transform:uppercase; letter-spacing:0.4px;">Foto</div>
+              <div style="font-family:'Archivo Black',sans-serif; font-size:14px; color:var(--text); margin-top:2px;">${fmt(photo)}€</div>
+            </div>
+            <div>
+              <div style="font-size:9px; color:var(--text3); font-weight:700; text-transform:uppercase; letter-spacing:0.4px;">Beribu</div>
+              <div style="font-family:'Archivo Black',sans-serif; font-size:14px; color:var(--text); margin-top:2px;">${fmt(beribu)}€</div>
+            </div>
           </div>
         </div>
       `;
     }).join('');
     document.getElementById('historyList').innerHTML = weeksHtml;
 
-    // Months as secondary
-    const monthNames = ['Sausis','Vasaris','Kovas','Balandis','Gegužė','Birželis','Liepa','Rugpjūtis','Rugsėjis','Spalis','Lapkritis','Gruodis'];
-    const monthsHTML = Object.entries(months).sort().reverse().map(([mk, m]) => {
-      const [year, month] = mk.split('-');
-      return `
-        <div class="history-row" onclick="currentMonth='${mk}'; setPeriod('month');">
-          <div class="history-week">
-            <div class="num">${monthNames[parseInt(month)-1].slice(0,3)}</div>
-            <div class="lbl">${year}</div>
-          </div>
-          <div class="history-info">
-            <div class="history-amount">${fmt(m.income)}€</div>
-            <div class="history-sub">${m.count} sav. · RL ${fmt(m.rl)}€</div>
-          </div>
-        </div>
-      `;
-    }).join('');
-    document.getElementById('monthsList').innerHTML = monthsHTML;
-
     const sectionTitles = document.querySelectorAll('#page-history .section-title');
-    if (sectionTitles[0]) sectionTitles[0].textContent = 'Visos savaitės';
-    if (sectionTitles[1]) sectionTitles[1].textContent = 'Mėnesių suvestinė';
+    if (sectionTitles[0]) sectionTitles[0].textContent = 'Savaitės pagal šaltinį';
   }
 }
 
