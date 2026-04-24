@@ -1329,25 +1329,29 @@ function loadData() {
 }
 
 // One-time income reset — user is re-entering income manually.
-// Keeps: photo_cash (user's photography cash is correct), expenses, ads, goals,
-//        salary, tax, recurringExpenses, codes_sent, reviews, outreach, notes.
-// v2: wiped everything (photo_cash included).
-// v3: keeps photo_cash. User re-entering RL / Shopify photo / Beribu from scratch.
+// Keeps: rlDaily (RetouchLab daily tracker entries are correct and verified),
+//        photo_cash (photography cash is correct), expenses, ads, goals, salary,
+//        tax, recurringExpenses, codes_sent, reviews, outreach, notes.
+// v2: wiped everything (photo_cash + rlDaily included).
+// v3: keeps photo_cash but still cleared rlDaily — wrong call, superseded.
+// v4: keeps both photo_cash AND rlDaily. Wipes only legacy per-week/month RL
+//     channel fields + photo_shopify + beribu_card + beribu_cash.
 const INCOME_FIELDS = [
   'rl_instagram','rl_email','rl_influencer','rl_meta','rl_tiktok','rl_blog','rl_direct','rl_count',
   'photo_shopify','beribu_card','beribu_cash'
 ];
 function wipeIncomeOnce(d) {
-  if (d.incomeWiped_v3) return d;
+  if (d.incomeWiped_v4) return d;
   Object.values(d.weeks || {}).forEach(w => {
     INCOME_FIELDS.forEach(k => { if (k in w) w[k] = 0; });
   });
   Object.values(d.months || {}).forEach(m => {
     INCOME_FIELDS.forEach(k => { if (k in m) m[k] = 0; });
   });
-  d.rlDaily = [];
+  // DO NOT touch d.rlDaily — those entries are the source of truth for RL revenue.
   d.incomeWiped_v2 = true;
   d.incomeWiped_v3 = true;
+  d.incomeWiped_v4 = true;
   return d;
 }
 
@@ -1401,17 +1405,19 @@ async function loadFromGitHub() {
 
     // If income was wiped locally but remote is pre-wipe, apply the same wipe to remote
     // content before merging — otherwise the old income comes right back.
+    // v4: do NOT clear rlDaily; preserve the RetouchLab daily tracker entries.
     let wipedRemote = false;
-    if (data.incomeWiped_v3 && !content.incomeWiped_v3) {
+    if (data.incomeWiped_v4 && !content.incomeWiped_v4) {
       Object.values(content.weeks || {}).forEach(w => {
         INCOME_FIELDS.forEach(k => { if (k in w) w[k] = 0; });
       });
       Object.values(content.months || {}).forEach(m => {
         INCOME_FIELDS.forEach(k => { if (k in m) m[k] = 0; });
       });
-      content.rlDaily = [];
+      // DO NOT touch content.rlDaily — rlDaily is the source of truth for RL revenue.
       content.incomeWiped_v2 = true;
       content.incomeWiped_v3 = true;
+      content.incomeWiped_v4 = true;
       wipedRemote = true;
     }
 
@@ -1454,6 +1460,7 @@ async function loadFromGitHub() {
     if (wipedRemote) {
       data.incomeWiped_v2 = true;
       data.incomeWiped_v3 = true;
+      data.incomeWiped_v4 = true;
       await syncToGitHub();
     }
   } catch(e) {
