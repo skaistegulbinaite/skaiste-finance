@@ -500,6 +500,11 @@ body {
       <div class="value">€<span id="ovPhoto">0</span></div>
       <div class="sub">Shopify + grynais</div>
     </div>
+    <div class="metric-card income">
+      <div class="label">Beribu</div>
+      <div class="value">€<span id="ovBeribu">0</span></div>
+      <div class="sub">Kortelė + grynais</div>
+    </div>
     <div class="metric-card expenses">
       <div class="label">Reklamoms</div>
       <div class="value">€<span id="ovAds">0</span></div>
@@ -674,47 +679,9 @@ body {
 <!-- ============ PAGE: ENTRY ============ -->
 <div class="page" id="page-entry">
 
-  <div class="entry-section">
-    <div class="entry-section-title"><span class="dot"></span>RetouchLab pardavimai (€)</div>
-    <div class="entry-row">
-      <div class="entry-icon">📷</div>
-      <div class="entry-label">Instagram organic<span class="desc">Iš Instagram be reklamos</span></div>
-      <input class="entry-input" type="number" step="0.01" id="in_rl_instagram" oninput="saveCurrent()">
-    </div>
-    <div class="entry-row">
-      <div class="entry-icon">📧</div>
-      <div class="entry-label">Email marketing<span class="desc">Iš Klaviyo email blast</span></div>
-      <input class="entry-input" type="number" step="0.01" id="in_rl_email" oninput="saveCurrent()">
-    </div>
-    <div class="entry-row">
-      <div class="entry-icon">💁</div>
-      <div class="entry-label">Influenceriai<span class="desc">Influencer share/post</span></div>
-      <input class="entry-input" type="number" step="0.01" id="in_rl_influencer" oninput="saveCurrent()">
-    </div>
-    <div class="entry-row">
-      <div class="entry-icon">🎯</div>
-      <div class="entry-label">Meta reklamos<span class="desc">Facebook + Instagram ads</span></div>
-      <input class="entry-input" type="number" step="0.01" id="in_rl_meta" oninput="saveCurrent()">
-    </div>
-    <div class="entry-row">
-      <div class="entry-icon">🎵</div>
-      <div class="entry-label">TikTok reklamos<span class="desc">TikTok ads</span></div>
-      <input class="entry-input" type="number" step="0.01" id="in_rl_tiktok" oninput="saveCurrent()">
-    </div>
-    <div class="entry-row">
-      <div class="entry-icon">📝</div>
-      <div class="entry-label">Blog/review<span class="desc">Blog'eriai, review'ai</span></div>
-      <input class="entry-input" type="number" step="0.01" id="in_rl_blog" oninput="saveCurrent()">
-    </div>
-    <div class="entry-row">
-      <div class="entry-icon">🔗</div>
-      <div class="entry-label">Tiesioginis / kita<span class="desc">Direct, organic Google</span></div>
-      <input class="entry-input" type="number" step="0.01" id="in_rl_direct" oninput="saveCurrent()">
-    </div>
-    <div class="entry-row">
-      <div class="entry-icon">🛒</div>
-      <div class="entry-label">Pardavimų kiekis<span class="desc">Iš viso šią savaitę</span></div>
-      <input class="entry-input" type="number" id="in_rl_count" oninput="saveCurrent()">
+  <div class="entry-section" style="background:var(--surface2); border-left:3px solid var(--accent); padding:12px 14px;">
+    <div style="font-size:12px; color:var(--text2);">
+      <strong style="color:var(--accent);">RetouchLab pajamos</strong> — įvedamos <strong>tik</strong> per Daily Revenue Tracker (RetouchLab kortelę). Čia nereikia.
     </div>
   </div>
 
@@ -729,6 +696,20 @@ body {
       <div class="entry-icon">💵</div>
       <div class="entry-label">Grynais<span class="desc">Cash mokėjimai</span></div>
       <input class="entry-input" type="number" step="0.01" id="in_photo_cash" oninput="saveCurrent()">
+    </div>
+  </div>
+
+  <div class="entry-section">
+    <div class="entry-section-title"><span class="dot"></span>Beribu (€)</div>
+    <div class="entry-row">
+      <div class="entry-icon">💳</div>
+      <div class="entry-label">Į kortelę<span class="desc">Paskutinis atlyginimas / freelance</span></div>
+      <input class="entry-input" type="number" step="0.01" id="in_beribu_card" oninput="saveCurrent()">
+    </div>
+    <div class="entry-row">
+      <div class="entry-icon">💵</div>
+      <div class="entry-label">Grynais<span class="desc">Cash mokėjimai</span></div>
+      <input class="entry-input" type="number" step="0.01" id="in_beribu_cash" oninput="saveCurrent()">
     </div>
   </div>
 
@@ -1331,6 +1312,7 @@ function emptyMonth() {
     rl_instagram: 0, rl_email: 0, rl_influencer: 0,
     rl_meta: 0, rl_tiktok: 0, rl_blog: 0, rl_direct: 0, rl_count: 0,
     photo_shopify: 0, photo_cash: 0,
+    beribu_card: 0, beribu_cash: 0,
     ads_meta: 0, ads_tiktok: 0, ads_google: 0,
     retoucher: 0, buhaltere: 0, extra: 0, extra_notes: '',
     codes_sent: 0, reviews: 0, outreach: 0,
@@ -1575,6 +1557,7 @@ function getMonthAggregate(monthKey) {
     'rl_instagram','rl_email','rl_influencer','rl_meta',
     'rl_tiktok','rl_blog','rl_direct','rl_count',
     'photo_shopify','photo_cash',
+    'beribu_card','beribu_cash',
     'ads_meta','ads_tiktok','ads_google',
     'retoucher','buhaltere','extra',
     'codes_sent','reviews','outreach',
@@ -1607,7 +1590,8 @@ function calcRetouchLabAgg(agg) {
 }
 
 function calcMonthIncome2(agg) {
-  return calcRetouchLabAgg(agg) + (agg.photo_shopify||0) + (agg.photo_cash||0);
+  return calcRetouchLabAgg(agg) + (agg.photo_shopify||0) + (agg.photo_cash||0) +
+         (agg.beribu_card||0) + (agg.beribu_cash||0);
 }
 
 function calcMonthExpenses2(agg) {
@@ -1624,6 +1608,7 @@ function emptyWeek() {
     rl_instagram: 0, rl_email: 0, rl_influencer: 0,
     rl_meta: 0, rl_tiktok: 0, rl_blog: 0, rl_direct: 0, rl_count: 0,
     photo_shopify: 0, photo_cash: 0,
+    beribu_card: 0, beribu_cash: 0,
     ads_meta: 0, ads_tiktok: 0, ads_google: 0,
     retoucher: 0, buhaltere: 0, extra: 0, extra_notes: '',
     codes_sent: 0, reviews: 0, outreach: 0,
@@ -1644,7 +1629,8 @@ function calcRetouchLab(week) {
 }
 
 function calcWeekIncome(week) {
-  return calcRetouchLab(week) + (week.photo_shopify||0) + (week.photo_cash||0);
+  return calcRetouchLab(week) + (week.photo_shopify||0) + (week.photo_cash||0) +
+         (week.beribu_card||0) + (week.beribu_cash||0);
 }
 
 // rlDaily helpers — sum daily revenue entries for a given week or month
@@ -2568,37 +2554,47 @@ function renderInsights() {
 }
 
 function refreshOverview() {
-  let income, expenses, profit, rl, photo, ads, salesCount, adRevenue;
+  let income, expenses, profit, rl, photo, beribu, ads, salesCount, adRevenue;
   let isMonth = currentPeriod === 'month';
 
+  // RL revenue priority: if rlDaily has entries in the period, use daily only.
+  // Legacy weekly RL fields only count for periods with ZERO daily entries.
   if (isMonth) {
     const agg = getMonthAggregate(currentMonth);
-    income = calcMonthIncome2(agg);
     expenses = calcMonthExpenses2(agg);
-    rl = calcRetouchLabAgg(agg);
     photo = (agg.photo_shopify||0) + (agg.photo_cash||0);
+    beribu = (agg.beribu_card||0) + (agg.beribu_cash||0);
     ads = (agg.ads_meta||0) + (agg.ads_tiktok||0) + (agg.ads_google||0);
-    salesCount = agg.rl_count || 0;
     adRevenue = (agg.rl_meta||0) + (agg.rl_tiktok||0);
-    // Add rlDaily entries for the month
+
     const rlDailyAmt = getRLDailyForMonth(currentMonth);
-    rl += rlDailyAmt;
-    income += rlDailyAmt;
-    salesCount += getRLDailyCountForMonth(currentMonth);
+    const rlDailyCount = getRLDailyCountForMonth(currentMonth);
+    if (rlDailyAmt > 0 || rlDailyCount > 0) {
+      rl = rlDailyAmt;
+      salesCount = rlDailyCount;
+    } else {
+      rl = calcRetouchLabAgg(agg);
+      salesCount = agg.rl_count || 0;
+    }
+    income = rl + photo + beribu;
   } else {
     const week = getWeek(currentWeek);
-    income = calcWeekIncome(week);
     expenses = calcWeekExpenses(week);
-    rl = calcRetouchLab(week);
     photo = (week.photo_shopify||0) + (week.photo_cash||0);
+    beribu = (week.beribu_card||0) + (week.beribu_cash||0);
     ads = (week.ads_meta||0) + (week.ads_tiktok||0) + (week.ads_google||0);
-    salesCount = week.rl_count || 0;
     adRevenue = (week.rl_meta||0) + (week.rl_tiktok||0);
-    // Add rlDaily entries for the week
+
     const rlDailyAmt = getRLDailyForWeek(currentWeek);
-    rl += rlDailyAmt;
-    income += rlDailyAmt;
-    salesCount += getRLDailyCountForWeek(currentWeek);
+    const rlDailyCount = getRLDailyCountForWeek(currentWeek);
+    if (rlDailyAmt > 0 || rlDailyCount > 0) {
+      rl = rlDailyAmt;
+      salesCount = rlDailyCount;
+    } else {
+      rl = calcRetouchLab(week);
+      salesCount = week.rl_count || 0;
+    }
+    income = rl + photo + beribu;
   }
   profit = income - expenses;
 
@@ -2612,6 +2608,7 @@ function refreshOverview() {
   document.getElementById('ovRL').textContent = fmt(rl);
   document.getElementById('ovRLSales').textContent = salesCount;
   document.getElementById('ovPhoto').textContent = fmt(photo);
+  document.getElementById('ovBeribu').textContent = fmt(beribu);
   document.getElementById('ovAds').textContent = fmt(ads);
 
   // Ad ROI
@@ -3054,8 +3051,8 @@ function refreshRetouchLab() {
 }
 
 const ENTRY_FIELDS = [
-  'rl_instagram','rl_email','rl_influencer','rl_meta','rl_tiktok','rl_blog','rl_direct','rl_count',
   'photo_shopify','photo_cash',
+  'beribu_card','beribu_cash',
   'ads_meta','ads_tiktok','ads_google','retoucher','buhaltere','extra',
   'codes_sent','reviews','outreach'
 ];
@@ -3135,7 +3132,7 @@ function refreshHistory() {
       months[monthKey] = {
         income: 0, rl: 0, expenses: 0, count: 0,
         rl_instagram:0, rl_email:0, rl_influencer:0, rl_meta:0, rl_tiktok:0, rl_blog:0, rl_direct:0,
-        photo_shopify:0, photo_cash:0
+        photo_shopify:0, photo_cash:0, beribu_card:0, beribu_cash:0
       };
     }
     const w = data.weeks[wk];
@@ -3144,7 +3141,7 @@ function refreshHistory() {
     months[monthKey].expenses += calcWeekExpenses(w);
     months[monthKey].count++;
     ['rl_instagram','rl_email','rl_influencer','rl_meta','rl_tiktok','rl_blog','rl_direct',
-     'photo_shopify','photo_cash'].forEach(k => {
+     'photo_shopify','photo_cash','beribu_card','beribu_cash'].forEach(k => {
       months[monthKey][k] += w[k] || 0;
     });
   });
@@ -3170,6 +3167,12 @@ function refreshHistory() {
       const [year, month] = mk.split('-');
       const profit = m.income - (m.expenses + data.recurringExpenses.reduce((s,e)=>s+e.amount, 0));
       const photo = m.photo_shopify + m.photo_cash;
+      const beribu = m.beribu_card + m.beribu_cash;
+      // RL display: use daily if any exists for this month, else legacy weekly sum
+      const rlDailyAmt = getRLDailyForMonth(mk);
+      const rlDisplay = rlDailyAmt > 0 ? rlDailyAmt : m.rl;
+      const incomeDisplay = rlDisplay + photo + beribu;
+      const profitDisplay = incomeDisplay - (m.expenses + data.recurringExpenses.reduce((s,e)=>s+e.amount, 0));
       return `
         <div class="history-row" onclick="currentMonth='${mk}'; showPage('overview');" style="display:block; padding:16px;">
           <div style="display:flex; align-items:center; gap:14px; margin-bottom:10px;">
@@ -3178,21 +3181,25 @@ function refreshHistory() {
               <div class="lbl">${year}</div>
             </div>
             <div class="history-info">
-              <div class="history-amount">${fmt(m.income)}€</div>
+              <div class="history-amount">${fmt(incomeDisplay)}€</div>
               <div class="history-sub">Pajamos · ${m.count} sav.</div>
             </div>
-            <div class="history-pill ${profit >= 0 ? 'profit' : 'loss'}">
-              ${profit >= 0 ? '+' : ''}${fmt(profit)}€
+            <div class="history-pill ${profitDisplay >= 0 ? 'profit' : 'loss'}">
+              ${profitDisplay >= 0 ? '+' : ''}${fmt(profitDisplay)}€
             </div>
           </div>
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; padding-top:10px; border-top:1px solid var(--border);">
+          <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; padding-top:10px; border-top:1px solid var(--border);">
             <div>
               <div style="font-size:9px; color:var(--text3); font-weight:700; text-transform:uppercase; letter-spacing:0.4px;">RetouchLab</div>
-              <div style="font-family:'Archivo Black',sans-serif; font-size:14px; color:var(--accent); margin-top:2px;">${fmt(m.rl)}€</div>
+              <div style="font-family:'Archivo Black',sans-serif; font-size:14px; color:var(--accent); margin-top:2px;">${fmt(rlDisplay)}€</div>
             </div>
             <div>
               <div style="font-size:9px; color:var(--text3); font-weight:700; text-transform:uppercase; letter-spacing:0.4px;">Foto</div>
               <div style="font-family:'Archivo Black',sans-serif; font-size:14px; color:var(--text); margin-top:2px;">${fmt(photo)}€</div>
+            </div>
+            <div>
+              <div style="font-size:9px; color:var(--text3); font-weight:700; text-transform:uppercase; letter-spacing:0.4px;">Beribu</div>
+              <div style="font-family:'Archivo Black',sans-serif; font-size:14px; color:var(--text); margin-top:2px;">${fmt(beribu)}€</div>
             </div>
           </div>
         </div>
