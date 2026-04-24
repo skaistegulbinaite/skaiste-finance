@@ -822,6 +822,12 @@ body {
     <textarea class="entry-textarea" id="in_notes" placeholder="Kas veikė? Kas neveikė? Ką padariau šią savaitę..." oninput="saveCurrent()"></textarea>
   </div>
 
+  <div class="section-header">
+    <div class="section-title">Reguliarios mėnesinės išlaidos</div>
+  </div>
+  <div class="settings-list" id="recurringList"></div>
+  <button class="settings-add" onclick="addRecurringExpense()">+ Pridėti išlaidą</button>
+
 </div>
 
 <!-- ============ PAGE: HISTORY (Savaitės) ============ -->
@@ -837,14 +843,6 @@ body {
 
 <!-- ============ PAGE: SETTINGS ============ -->
 <div class="page" id="page-settings">
-
-  <div class="section-header">
-    <div class="section-title">Reguliarios mėnesinės išlaidos</div>
-  </div>
-
-  <div class="settings-list" id="recurringList"></div>
-
-  <button class="settings-add" onclick="addRecurringExpense()">+ Pridėti išlaidą</button>
 
   <div class="section-header">
     <div class="section-title">Tikslai</div>
@@ -1986,24 +1984,21 @@ function setBriefingKind(kind) {
 }
 
 function refreshBriefing() {
-  if (!analyticsData) {
-    loadAnalyticsFromGitHub().then(() => {
-      if (analyticsData) renderBriefing();
-    });
-  } else {
-    renderBriefing();
+  // Always re-fetch: morning/evening briefings change through the day and the
+  // sync script pushes fresh data at 7:30 AM + 9:30 PM.
+  const loadEl = document.getElementById('brLoadingState');
+  if (loadEl) {
+    loadEl.style.display = 'block';
+    loadEl.innerHTML = '<div class="emoji">⏳</div><div class="title">Krauname...</div><div class="desc">Atsisiunčiame iš GitHub</div>';
   }
+  loadAnalyticsFromGitHub('brLoadingState').then(() => {
+    if (analyticsData) renderBriefing();
+  });
 }
 
 function refreshBriefingData() {
   analyticsData = null;
-  document.getElementById('brLoadingState').style.display = 'block';
-  loadAnalyticsFromGitHub().then(() => {
-    if (analyticsData) {
-      document.getElementById('brLoadingState').style.display = 'none';
-      renderBriefing();
-    }
-  });
+  refreshBriefing();
 }
 
 function renderBriefing() {
@@ -2416,47 +2411,60 @@ function renderBriefingChart(chartData) {
 // ============ INSIGHTS PAGE (GA4 + Search Console) ============
 let analyticsData = null;
 
-async function loadAnalyticsFromGitHub() {
+// Load analytics-data.json from the private data repo.
+// Pure loader — sets `analyticsData` and surfaces errors via the caller's loading element.
+// Callers (refreshBriefing / refreshInsights2) are responsible for rendering after this resolves.
+async function loadAnalyticsFromGitHub(loadingElId) {
+  const loadingEl = loadingElId ? document.getElementById(loadingElId) : null;
+  const setLoad = (emoji, title, desc) => {
+    if (!loadingEl) return;
+    loadingEl.style.display = 'block';
+    loadingEl.innerHTML = `<div class="emoji">${emoji}</div><div class="title">${title}</div><div class="desc">${desc}</div>`;
+  };
   if (!ghToken) {
-    document.getElementById('insLoadingState').innerHTML =
-      '<div class="emoji">🔒</div><div class="title">Reikia GitHub token</div><div class="desc">Eik į Nustatymai → Sinchronizacija</div>';
+    setLoad('🔒', 'Reikia GitHub token', 'Eik į Nustatymai → Sinchronizacija');
     return;
   }
   try {
-    const res = await fetch(`https://api.github.com/repos/skaistegulbinaite/skaiste-finance-data/contents/analytics-data.json`, {
+    // Cache-bust so we always see the latest push from the sync script.
+    const res = await fetch(`https://api.github.com/repos/skaistegulbinaite/skaiste-finance-data/contents/analytics-data.json?ts=${Date.now()}`, {
       headers: { 'Authorization': `token ${ghToken}`, 'Accept': 'application/vnd.github.v3+json' }
     });
     if (!res.ok) {
-      document.getElementById('insLoadingState').innerHTML =
-        '<div class="emoji">📊</div><div class="title">Dar nėra duomenų</div><div class="desc">Pasakyk Claude paleisti analytics_sync.py</div>';
+      setLoad('📊', 'Dar nėra duomenų', `GitHub ${res.status} — patikrink analytics_sync.py`);
       return;
     }
     const fileData = await res.json();
     analyticsData = JSON.parse(decodeURIComponent(escape(atob(fileData.content))));
-    document.getElementById('insLoadingState').style.display = 'none';
-    renderInsights();
+    if (loadingEl) loadingEl.style.display = 'none';
   } catch(e) {
     console.log('Analytics load failed:', e);
-    document.getElementById('insLoadingState').innerHTML =
-      '<div class="emoji">⚠️</div><div class="title">Klaida kraunant</div><div class="desc">' + e.message + '</div>';
+    setLoad('⚠️', 'Klaida kraunant', e.message || 'Nežinoma klaida');
   }
 }
 
 function refreshInsights2() {
   if (!analyticsData) {
-    loadAnalyticsFromGitHub();
+    loadAnalyticsFromGitHub('insLoadingState').then(() => {
+      if (analyticsData) renderInsights();
+    });
   } else {
     renderInsights();
-    document.getElementById('insLoadingState').style.display = 'none';
+    const el = document.getElementById('insLoadingState');
+    if (el) el.style.display = 'none';
   }
 }
 
 function refreshInsightsData() {
   analyticsData = null;
-  document.getElementById('insLoadingState').style.display = 'block';
-  document.getElementById('insLoadingState').innerHTML =
-    '<div class="emoji">📊</div><div class="title">Krauname duomenis...</div><div class="desc">Atsisiunčiame iš GitHub</div>';
-  loadAnalyticsFromGitHub();
+  const el = document.getElementById('insLoadingState');
+  if (el) {
+    el.style.display = 'block';
+    el.innerHTML = '<div class="emoji">📊</div><div class="title">Krauname duomenis...</div><div class="desc">Atsisiunčiame iš GitHub</div>';
+  }
+  loadAnalyticsFromGitHub('insLoadingState').then(() => {
+    if (analyticsData) renderInsights();
+  });
 }
 
 function renderInsights() {
@@ -3277,6 +3285,9 @@ function refreshEntry() {
     document.getElementById('in_extra_notes').value = week.extra_notes || '';
     document.getElementById('in_notes').value = week.notes || '';
   }
+
+  // Recurring expenses block now lives on the Entry page too
+  renderRecurringList();
 }
 
 function saveCurrent() {
@@ -3453,8 +3464,10 @@ function refreshHistory() {
   }
 }
 
-function refreshSettings() {
-  const html = data.recurringExpenses.map((e, i) => `
+function renderRecurringList() {
+  const el = document.getElementById('recurringList');
+  if (!el) return;
+  el.innerHTML = data.recurringExpenses.map((e, i) => `
     <div class="settings-item">
       <div class="settings-name">${e.name}</div>
       <input class="settings-edit" type="number" step="0.01" value="${e.amount}" onchange="updateRecurring(${i}, this.value)">
@@ -3463,7 +3476,10 @@ function refreshSettings() {
       </button>
     </div>
   `).join('');
-  document.getElementById('recurringList').innerHTML = html;
+}
+
+function refreshSettings() {
+  renderRecurringList();
 
   document.getElementById('goalRetouchLab').value = data.goals.retouchlab_monthly;
   document.getElementById('goalTotal').value = data.goals.total_monthly;
@@ -3492,7 +3508,7 @@ function deleteRecurring(idx) {
   if (confirm(`Ištrinti "${data.recurringExpenses[idx].name}"?`)) {
     data.recurringExpenses.splice(idx, 1);
     saveData();
-    refreshSettings();
+    renderRecurringList();
     showSaveToast();
   }
 }
@@ -3514,7 +3530,7 @@ function saveModal() {
   if (name && amount > 0) {
     data.recurringExpenses.push({name, amount, currency: 'EUR'});
     saveData();
-    refreshSettings();
+    renderRecurringList();
     showSaveToast();
   }
   closeModal();
