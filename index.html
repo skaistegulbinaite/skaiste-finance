@@ -828,6 +828,34 @@ body {
   <div class="settings-list" id="recurringList"></div>
   <button class="settings-add" onclick="addRecurringExpense()">+ Pridėti išlaidą</button>
 
+  <div class="section-header">
+    <div class="section-title">Tikslai</div>
+  </div>
+  <div class="settings-list">
+    <div class="settings-item">
+      <div class="settings-name">RetouchLab tikslas/mėn</div>
+      <input class="settings-edit" type="number" id="goalRetouchLab" onchange="saveGoals()">
+    </div>
+    <div class="settings-item">
+      <div class="settings-name">Bendras tikslas/mėn</div>
+      <input class="settings-edit" type="number" id="goalTotal" onchange="saveGoals()">
+    </div>
+  </div>
+
+  <div class="section-header">
+    <div class="section-title">Mokesčiai (MB)</div>
+  </div>
+  <div class="settings-list">
+    <div class="settings-item">
+      <div class="settings-name">Mėn. atlyginimas sau (€)<span style="display:block;font-size:9px;color:var(--text3);font-weight:500;margin-top:2px;">Lėšos asmeniniam naudojimui</span></div>
+      <input class="settings-edit" type="number" id="taxMbSalary" onchange="saveTaxSettings()">
+    </div>
+    <div class="settings-item">
+      <div class="settings-name">PVM ribinė riba (€)<span style="display:block;font-size:9px;color:var(--text3);font-weight:500;margin-top:2px;">Per 12 mėn — privaloma registruotis</span></div>
+      <input class="settings-edit" type="number" id="taxVatThreshold" onchange="saveTaxSettings()">
+    </div>
+  </div>
+
 </div>
 
 <!-- ============ PAGE: HISTORY (Savaitės) ============ -->
@@ -843,36 +871,6 @@ body {
 
 <!-- ============ PAGE: SETTINGS ============ -->
 <div class="page" id="page-settings">
-
-  <div class="section-header">
-    <div class="section-title">Tikslai</div>
-  </div>
-
-  <div class="settings-list">
-    <div class="settings-item">
-      <div class="settings-name">RetouchLab tikslas/mėn</div>
-      <input class="settings-edit" type="number" id="goalRetouchLab" onchange="saveGoals()">
-    </div>
-    <div class="settings-item">
-      <div class="settings-name">Bendras tikslas/mėn</div>
-      <input class="settings-edit" type="number" id="goalTotal" onchange="saveGoals()">
-    </div>
-  </div>
-
-  <div class="section-header">
-    <div class="section-title">Mokesčiai (MB)</div>
-  </div>
-
-  <div class="settings-list">
-    <div class="settings-item">
-      <div class="settings-name">Mėn. atlyginimas sau (€)<span style="display:block;font-size:9px;color:var(--text3);font-weight:500;margin-top:2px;">Lėšos asmeniniam naudojimui</span></div>
-      <input class="settings-edit" type="number" id="taxMbSalary" onchange="saveTaxSettings()">
-    </div>
-    <div class="settings-item">
-      <div class="settings-name">PVM ribinė riba (€)<span style="display:block;font-size:9px;color:var(--text3);font-weight:500;margin-top:2px;">Per 12 mėn — privaloma registruotis</span></div>
-      <input class="settings-edit" type="number" id="taxVatThreshold" onchange="saveTaxSettings()">
-    </div>
-  </div>
 
   <div class="section-header">
     <div class="section-title">GitHub sync</div>
@@ -1895,7 +1893,7 @@ function showPage(page) {
   if (page === 'overview' || page === 'retouchlab') {
     currentPeriod = 'month';
     localStorage.setItem('finance-period', 'month');
-  } else if (page === 'history') {
+  } else if (page === 'history' || page === 'entry') {
     currentPeriod = 'week';
     localStorage.setItem('finance-period', 'week');
   }
@@ -1904,9 +1902,9 @@ function showPage(page) {
   document.getElementById('periodWeek')?.classList.toggle('active', currentPeriod === 'week');
   document.getElementById('periodMonth')?.classList.toggle('active', currentPeriod === 'month');
 
-  // Hide period toggle on context-locked pages
+  // Hide period toggle on all pages — we no longer toggle week/month manually
   const toggle = document.querySelector('.period-toggle');
-  if (toggle) toggle.style.display = (page === 'overview' || page === 'history' || page === 'retouchlab' || page === 'briefing' || page === 'settings') ? 'none' : '';
+  if (toggle) toggle.style.display = 'none';
 
   // Hide week/month navigation arrows on daily-only pages (Briefing, Settings)
   const weekNav = document.querySelector('.week-nav');
@@ -3255,60 +3253,39 @@ const ENTRY_FIELDS = [
 ];
 
 function refreshEntry() {
-  // Add a header indicator showing current period mode
-  let entryNoteEl = document.getElementById('entryPeriodNote');
-  if (!entryNoteEl) {
-    entryNoteEl = document.createElement('div');
-    entryNoteEl.id = 'entryPeriodNote';
-    entryNoteEl.style.cssText = 'background:var(--surface2); padding:12px 16px; border-radius:14px; margin-bottom:14px; font-size:12px; color:var(--text2); text-align:center;';
-    document.getElementById('page-entry').prepend(entryNoteEl);
-  }
+  // Weekly-only. Remove any leftover period-note element from older versions.
+  const oldNote = document.getElementById('entryPeriodNote');
+  if (oldNote) oldNote.remove();
 
-  if (currentPeriod === 'month') {
-    entryNoteEl.innerHTML = `<strong style="color:var(--accent)">Mėnesio režimas</strong> — įvedi MĖNESIO sumas. ${getMonthName(currentMonth)}<br><span style="font-size:10px;color:var(--text3);">Saugoma atskirai nuo savaitės įvedimo</span>`;
+  const week = getWeek(currentWeek);
+  ENTRY_FIELDS.forEach(f => {
+    const el = document.getElementById('in_'+f);
+    if (el) el.value = week[f] || '';
+  });
+  document.getElementById('in_extra_notes').value = week.extra_notes || '';
+  document.getElementById('in_notes').value = week.notes || '';
 
-    // Load monthly entry directly (NOT aggregated from weeks)
-    const month = getMonth(currentMonth);
-    ENTRY_FIELDS.forEach(f => {
-      const el = document.getElementById('in_'+f);
-      if (el) el.value = month[f] || '';
-    });
-    document.getElementById('in_notes').value = month.notes || '';
-    document.getElementById('in_extra_notes').value = month.extra_notes || '';
-  } else {
-    entryNoteEl.innerHTML = `<strong style="color:var(--accent)">Savaitės režimas</strong> — įvedi SAVAITĖS sumas`;
-    const week = getWeek(currentWeek);
-    ENTRY_FIELDS.forEach(f => {
-      const el = document.getElementById('in_'+f);
-      if (el) el.value = week[f] || '';
-    });
-    document.getElementById('in_extra_notes').value = week.extra_notes || '';
-    document.getElementById('in_notes').value = week.notes || '';
-  }
-
-  // Recurring expenses block now lives on the Entry page too
+  // Recurring expenses, goals, tax — all edited from the Entry page now
   renderRecurringList();
+  const goalRL = document.getElementById('goalRetouchLab');
+  if (goalRL) goalRL.value = data.goals.retouchlab_monthly;
+  const goalTot = document.getElementById('goalTotal');
+  if (goalTot) goalTot.value = data.goals.total_monthly;
+  const mbSal = document.getElementById('taxMbSalary');
+  if (mbSal) mbSal.value = data.tax?.mbSalary || 1500;
+  const vatTh = document.getElementById('taxVatThreshold');
+  if (vatTh) vatTh.value = data.tax?.vatThreshold || 45000;
 }
 
 function saveCurrent() {
-  if (currentPeriod === 'month') {
-    // Save to the SEPARATE monthly entries store (NOT touching weeks)
-    const month = getMonth(currentMonth);
-    ENTRY_FIELDS.forEach(f => {
-      const el = document.getElementById('in_'+f);
-      if (el) month[f] = parseFloat(el.value) || 0;
-    });
-    month.extra_notes = document.getElementById('in_extra_notes').value;
-    month.notes = document.getElementById('in_notes').value;
-  } else {
-    const week = getWeek(currentWeek);
-    ENTRY_FIELDS.forEach(f => {
-      const el = document.getElementById('in_'+f);
-      if (el) week[f] = parseFloat(el.value) || 0;
-    });
-    week.extra_notes = document.getElementById('in_extra_notes').value;
-    week.notes = document.getElementById('in_notes').value;
-  }
+  // Weekly-only entry. Monthly mode was removed to avoid confusion.
+  const week = getWeek(currentWeek);
+  ENTRY_FIELDS.forEach(f => {
+    const el = document.getElementById('in_'+f);
+    if (el) week[f] = parseFloat(el.value) || 0;
+  });
+  week.extra_notes = document.getElementById('in_extra_notes').value;
+  week.notes = document.getElementById('in_notes').value;
   saveData();
   showSaveToast();
 }
