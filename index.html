@@ -99,6 +99,41 @@ body {
 .period-btn.active { background:var(--accent); color:var(--bg); }
 .period-btn:active { transform:scale(0.95); }
 
+/* Weekly breakdown table (Dashboard → Savaitės view) */
+.weekly-table {
+  background:var(--surface); border:1px solid var(--border); border-radius:16px;
+  overflow:hidden; margin-bottom:14px;
+}
+.weekly-row {
+  display:grid; grid-template-columns: 62px 1fr 1fr 1fr 72px;
+  gap:8px; align-items:center;
+  padding:12px 14px; border-bottom:1px solid var(--border);
+  font-size:12px;
+}
+.weekly-row:last-child { border-bottom:none; }
+.weekly-row.header {
+  background:var(--surface2); font-size:9px; font-weight:700;
+  color:var(--text3); text-transform:uppercase; letter-spacing:0.5px;
+}
+.weekly-row .wk-label { color:var(--text2); font-weight:700; }
+.weekly-row .wk-label .num { font-family:'Archivo Black',sans-serif; color:var(--text); font-size:13px; }
+.weekly-row .wk-val { text-align:right; font-family:'Archivo Black',sans-serif; font-size:13px; }
+.weekly-row .wk-val.rl { color:var(--accent); }
+.weekly-row .wk-val.zero { color:var(--text3); opacity:0.5; }
+.weekly-row .wk-total { text-align:right; font-family:'Archivo Black',sans-serif; font-size:14px; color:var(--text); }
+.weekly-total {
+  display:flex; justify-content:space-between; align-items:baseline;
+  padding:14px 16px; background:var(--surface); border:1px solid var(--border);
+  border-radius:16px; margin-bottom:14px;
+}
+.weekly-total .lbl { font-size:11px; color:var(--text3); text-transform:uppercase; letter-spacing:0.5px; font-weight:700; }
+.weekly-total .val { font-family:'Archivo Black',sans-serif; font-size:22px; color:var(--accent); }
+.weekly-empty {
+  padding:28px 16px; text-align:center; color:var(--text3);
+  background:var(--surface); border:1px dashed var(--border); border-radius:16px;
+  font-size:12px;
+}
+
 /* PAGE CONTAINER */
 .page { display:none; padding:0 16px; }
 .page.active { display:block; }
@@ -479,6 +514,16 @@ body {
 <!-- ============ PAGE: OVERVIEW ============ -->
 <div class="page active" id="page-overview">
 
+  <!-- Dashboard view toggle: Monthly vs Weekly breakdown -->
+  <div class="period-toggle" style="display:flex;">
+    <div class="period-toggle-inner">
+      <button class="period-btn active" id="dashViewMonth" onclick="setDashView('month')">Mėnuo</button>
+      <button class="period-btn" id="dashViewWeeks" onclick="setDashView('weeks')">Savaitės</button>
+    </div>
+  </div>
+
+  <div id="ovMonthly">
+
   <div class="hero-card">
     <div class="hero-label">Šios savaitės pelnas</div>
     <div class="hero-amount"><span class="currency">€</span><span id="ovProfit">0</span></div>
@@ -586,6 +631,17 @@ body {
       <span id="goalTotPct">0%</span>
       <span id="goalTotNeeded">Reikia 10,000€</span>
     </div>
+  </div>
+
+  </div><!-- /ovMonthly -->
+
+  <!-- Weekly breakdown for current month -->
+  <div id="ovWeekly" style="display:none;">
+    <div class="section-header">
+      <div class="section-title" id="ovWeeklyTitle">Savaitės šį mėnesį</div>
+    </div>
+    <div class="weekly-table" id="ovWeeklyTable"></div>
+    <div class="weekly-total" id="ovWeeklyTotal"></div>
   </div>
 
 </div>
@@ -1284,10 +1340,29 @@ function loadData() {
       if (!parsed.months) parsed.months = {};
       if (!parsed.rlDaily) parsed.rlDaily = [];
       const merged = {...DEFAULT_DATA, ...parsed};
-      return merged;
+      return wipeIncomeOnce(merged);
     }
   } catch(e) { console.error(e); }
   return JSON.parse(JSON.stringify(DEFAULT_DATA));
+}
+
+// One-time income reset — user is re-entering income manually.
+// Keeps: expenses, ads, goals, salary, tax, recurringExpenses, codes_sent, reviews, outreach, notes.
+const INCOME_FIELDS = [
+  'rl_instagram','rl_email','rl_influencer','rl_meta','rl_tiktok','rl_blog','rl_direct','rl_count',
+  'photo_shopify','photo_cash','beribu_card','beribu_cash'
+];
+function wipeIncomeOnce(d) {
+  if (d.incomeWiped_v2) return d;
+  Object.values(d.weeks || {}).forEach(w => {
+    INCOME_FIELDS.forEach(k => { if (k in w) w[k] = 0; });
+  });
+  Object.values(d.months || {}).forEach(m => {
+    INCOME_FIELDS.forEach(k => { if (k in m) m[k] = 0; });
+  });
+  d.rlDaily = [];
+  d.incomeWiped_v2 = true;
+  return d;
 }
 
 function emptyMonth() {
@@ -1337,6 +1412,22 @@ async function loadFromGitHub() {
     const fileData = await res.json();
     ghFinanceSha = fileData.sha;
     const content = JSON.parse(decodeURIComponent(escape(atob(fileData.content))));
+
+    // If income was wiped locally but remote is pre-wipe, apply the same wipe to remote
+    // content before merging — otherwise the old income comes right back.
+    let wipedRemote = false;
+    if (data.incomeWiped_v2 && !content.incomeWiped_v2) {
+      Object.values(content.weeks || {}).forEach(w => {
+        INCOME_FIELDS.forEach(k => { if (k in w) w[k] = 0; });
+      });
+      Object.values(content.months || {}).forEach(m => {
+        INCOME_FIELDS.forEach(k => { if (k in m) m[k] = 0; });
+      });
+      content.rlDaily = [];
+      content.incomeWiped_v2 = true;
+      wipedRemote = true;
+    }
+
     // Smart merge: combine local + remote (newest wins per field)
     const localUpdated = data.lastUpdated || 0;
     const remoteUpdated = content.lastUpdated || 0;
@@ -1369,6 +1460,13 @@ async function loadFromGitHub() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
       refreshAll();
       showSyncStatus('Sinchronizuota ✓');
+    }
+
+    // If we wiped remote content during merge, push the wipe back to GitHub
+    // so the fresh state is persisted (otherwise next load re-pulls old income).
+    if (wipedRemote) {
+      data.incomeWiped_v2 = true;
+      await syncToGitHub();
     }
   } catch(e) {
     console.log('GitHub load failed:', e);
@@ -1520,13 +1618,26 @@ function goToToday() {
   refreshAll();
 }
 
-// Get all weeks within a month
+// Assign a week to exactly ONE month — the month containing its Thursday (ISO 8601).
+// This prevents a cross-month week (e.g. Mar 30 – Apr 5) from being counted in both months.
+function weekOwnerMonth(weekKey) {
+  const {start} = getWeekDates(weekKey);
+  const thursday = new Date(start);
+  thursday.setUTCDate(start.getUTCDate() + 3);
+  return `${thursday.getUTCFullYear()}-${String(thursday.getUTCMonth()+1).padStart(2,'0')}`;
+}
+
+// Get all weeks owned by a month (each week assigned to one month only).
 function getWeeksInMonth(monthKey) {
   const {start, end} = getMonthDates(monthKey);
   const weekKeys = new Set();
-  const d = new Date(start);
-  while (d <= end) {
-    weekKeys.add(getWeekKey(d));
+  // Look one week before/after the month edges to catch boundary weeks.
+  const scanStart = new Date(start); scanStart.setUTCDate(scanStart.getUTCDate() - 7);
+  const scanEnd = new Date(end); scanEnd.setUTCDate(scanEnd.getUTCDate() + 7);
+  const d = new Date(scanStart);
+  while (d <= scanEnd) {
+    const wk = getWeekKey(d);
+    if (weekOwnerMonth(wk) === monthKey) weekKeys.add(wk);
     d.setUTCDate(d.getUTCDate() + 1);
   }
   return Array.from(weekKeys);
@@ -2553,7 +2664,84 @@ function renderInsights() {
   document.getElementById('insSearchPages').innerHTML = searchPagesHtml;
 }
 
+let dashView = localStorage.getItem('finance-dash-view') || 'month'; // 'month' | 'weeks'
+
+function setDashView(v) {
+  dashView = v;
+  localStorage.setItem('finance-dash-view', v);
+  document.getElementById('dashViewMonth').classList.toggle('active', v === 'month');
+  document.getElementById('dashViewWeeks').classList.toggle('active', v === 'weeks');
+  document.getElementById('ovMonthly').style.display = v === 'month' ? '' : 'none';
+  document.getElementById('ovWeekly').style.display = v === 'weeks' ? '' : 'none';
+  if (v === 'weeks') renderWeeklyBreakdown();
+}
+
+const MONTH_NAMES_LT = ['Sausis','Vasaris','Kovas','Balandis','Gegužė','Birželis','Liepa','Rugpjūtis','Rugsėjis','Spalis','Lapkritis','Gruodis'];
+
+function renderWeeklyBreakdown() {
+  const weekKeys = getWeeksInMonth(currentMonth).sort();
+  const [year, monthNum] = currentMonth.split('-').map(Number);
+  document.getElementById('ovWeeklyTitle').textContent =
+    `${MONTH_NAMES_LT[monthNum-1]} ${year} — savaitės`;
+
+  if (weekKeys.length === 0) {
+    document.getElementById('ovWeeklyTable').innerHTML =
+      '<div class="weekly-empty">Dar nėra savaičių šiame mėnesyje.</div>';
+    document.getElementById('ovWeeklyTotal').style.display = 'none';
+    return;
+  }
+
+  const header = `
+    <div class="weekly-row header">
+      <div>Savaitė</div>
+      <div style="text-align:right;">RetouchLab</div>
+      <div style="text-align:right;">Foto</div>
+      <div style="text-align:right;">Beribu</div>
+      <div style="text-align:right;">Viso</div>
+    </div>`;
+
+  let totRL = 0, totPhoto = 0, totBeribu = 0, totAll = 0;
+
+  const rows = weekKeys.map(wk => {
+    const w = data.weeks[wk] || {};
+    const rlDaily = getRLDailyForWeek(wk);
+    const rl = rlDaily > 0 ? rlDaily : calcRetouchLab(w);
+    const photo = (w.photo_shopify||0) + (w.photo_cash||0);
+    const beribu = (w.beribu_card||0) + (w.beribu_cash||0);
+    const total = rl + photo + beribu;
+    totRL += rl; totPhoto += photo; totBeribu += beribu; totAll += total;
+    const dates = getWeekDates(wk);
+    const wnum = wk.split('-W')[1];
+    const cls = v => v === 0 ? 'wk-val zero' : 'wk-val';
+    return `
+      <div class="weekly-row">
+        <div class="wk-label">
+          <div class="num">W${wnum}</div>
+          <div style="font-size:10px; color:var(--text3);">${formatDate(dates.start)}–${formatDate(dates.end)}</div>
+        </div>
+        <div class="${cls(rl)} rl">${fmt(rl)}€</div>
+        <div class="${cls(photo)}">${fmt(photo)}€</div>
+        <div class="${cls(beribu)}">${fmt(beribu)}€</div>
+        <div class="wk-total">${fmt(total)}€</div>
+      </div>`;
+  }).join('');
+
+  document.getElementById('ovWeeklyTable').innerHTML = header + rows;
+  document.getElementById('ovWeeklyTotal').style.display = 'flex';
+  document.getElementById('ovWeeklyTotal').innerHTML = `
+    <div class="lbl">Mėnesio pajamos iš viso</div>
+    <div class="val">${fmt(totAll)}€</div>
+  `;
+}
+
 function refreshOverview() {
+  // Sync dashboard view toggle state
+  document.getElementById('dashViewMonth').classList.toggle('active', dashView === 'month');
+  document.getElementById('dashViewWeeks').classList.toggle('active', dashView === 'weeks');
+  document.getElementById('ovMonthly').style.display = dashView === 'month' ? '' : 'none';
+  document.getElementById('ovWeekly').style.display = dashView === 'weeks' ? '' : 'none';
+  if (dashView === 'weeks') { renderWeeklyBreakdown(); return; }
+
   let income, expenses, profit, rl, photo, beribu, ads, salesCount, adRevenue;
   let isMonth = currentPeriod === 'month';
 
